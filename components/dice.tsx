@@ -6,14 +6,15 @@ import { cn } from "@/lib/utils"
 interface DiceProps {
   onRoll: (value: number) => void
   disabled?: boolean
+  isMyTurn?: boolean
 }
 
-export function Dice({ onRoll, disabled }: DiceProps) {
+export function Dice({ onRoll, disabled, isMyTurn = true }: DiceProps) {
   const [value, setValue] = useState(1)
   const [isRolling, setIsRolling] = useState(false)
 
   const roll = () => {
-    if (disabled || isRolling) return
+    if (disabled || isRolling || !isMyTurn) return
 
     setIsRolling(true)
 
@@ -68,20 +69,28 @@ export function Dice({ onRoll, disabled }: DiceProps) {
     }
   }
 
+  const isDisabled = disabled || isRolling || !isMyTurn
+
   return (
-    <button
-      onClick={roll}
-      disabled={disabled || isRolling}
-      className={cn(
-        "relative w-20 h-20 bg-white rounded-xl shadow-lg border-4 border-rose-300 transition-all",
-        isRolling && "animate-bounce",
-        !disabled && "hover:shadow-xl hover:scale-105 cursor-pointer",
-        disabled && "opacity-50 cursor-not-allowed",
-      )}
-    >
-      {getDiceFace().map((pos, i) => (
-        <div key={i} className={cn("absolute w-3 h-3 bg-rose-500 rounded-full", getPositionClass(pos))} />
-      ))}
-    </button>
+    <div className="flex flex-col items-center gap-2">
+      <button
+        onClick={roll}
+        disabled={isDisabled}
+        className={cn(
+          "relative w-16 h-16 md:w-20 md:h-20 bg-white rounded-xl shadow-lg border-4 transition-all",
+          isRolling && "animate-bounce",
+          !isDisabled && "hover:shadow-xl hover:scale-105 cursor-pointer border-rose-300",
+          isDisabled && "opacity-50 cursor-not-allowed border-gray-300",
+        )}
+      >
+        {getDiceFace().map((pos, i) => (
+          <div
+            key={i}
+            className={cn("absolute w-2.5 h-2.5 md:w-3 md:h-3 bg-rose-500 rounded-full", getPositionClass(pos))}
+          />
+        ))}
+      </button>
+      {!isMyTurn && !disabled && <p className="text-xs text-amber-600 font-medium animate-pulse">等待对方回合...</p>}
+    </div>
   )
 }

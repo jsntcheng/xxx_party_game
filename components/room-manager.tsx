@@ -84,10 +84,42 @@ export function RoomManager({
     setLoading(false)
   }
 
-  const copyRoomId = () => {
-    navigator.clipboard.writeText(createdRoomId || roomId || "")
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  const copyRoomId = async () => {
+    const idToCopy = createdRoomId || roomId || ""
+    if (!idToCopy) return
+
+    try {
+      // 尝试使用 Clipboard API
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(idToCopy)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      } else {
+        // 降级方案：使用 execCommand
+        const textArea = document.createElement("textarea")
+        textArea.value = idToCopy
+        textArea.style.position = "fixed"
+        textArea.style.left = "-999999px"
+        textArea.style.top = "-999999px"
+        document.body.appendChild(textArea)
+        textArea.focus()
+        textArea.select()
+
+        const successful = document.execCommand("copy")
+        document.body.removeChild(textArea)
+
+        if (successful) {
+          setCopied(true)
+          setTimeout(() => setCopied(false), 2000)
+        } else {
+          setError("复制失败，请手动复制")
+        }
+      }
+    } catch (err) {
+      console.error("复制失败:", err)
+      setError("复制失败，请手动复制: " + idToCopy)
+      setTimeout(() => setError(""), 3000)
+    }
   }
 
   const handleSeatClick = (seat: RoomConfig["seats"][0]) => {
@@ -106,14 +138,19 @@ export function RoomManager({
         <CardHeader className="text-center pb-2">
           <CardTitle className="text-xl text-rose-600">选择座位</CardTitle>
           <div className="flex items-center justify-center gap-2 mt-2">
-            <span className="text-2xl font-mono font-bold tracking-widest bg-rose-50 px-4 py-1 rounded-lg">
-              {displayRoomId}
-            </span>
-            <Button variant="outline" size="icon" onClick={copyRoomId} className="h-8 w-8 bg-transparent">
+            <input
+              type="text"
+              readOnly
+              value={displayRoomId}
+              className="text-xl md:text-2xl font-mono font-bold tracking-widest bg-rose-50 px-4 py-1 rounded-lg text-center border-0 focus:outline-none focus:ring-2 focus:ring-rose-300 w-36 md:w-40"
+              onClick={(e) => (e.target as HTMLInputElement).select()}
+            />
+            <Button variant="outline" size="icon" onClick={copyRoomId} className="h-9 w-9 bg-transparent">
               {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
             </Button>
           </div>
           <CardDescription className="mt-2">分享房间号邀请其他玩家加入</CardDescription>
+          {error && <p className="text-sm text-red-500 mt-1">{error}</p>}
         </CardHeader>
         <CardContent className="space-y-4">
           {/* 玩家昵称输入 */}

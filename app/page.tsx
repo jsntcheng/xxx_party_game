@@ -52,6 +52,19 @@ export default function GamePage() {
 
   const totalCells = cells.length + endpointCells.length + 2
 
+  const isMyTurn = useMemo(() => {
+    if (!roomId || !gameStarted) return true // 本地模式始终可以操作
+    if (players.length === 0) return false
+    const currentPlayer = players[currentPlayerIndex]
+    if (!currentPlayer) return false
+    return currentPlayer.id === playerId
+  }, [roomId, gameStarted, players, currentPlayerIndex, playerId])
+
+  const currentPlayerGender = useMemo(() => {
+    if (players.length === 0) return undefined
+    return players[currentPlayerIndex]?.gender
+  }, [players, currentPlayerIndex])
+
   // 检查同步是否可用
   useEffect(() => {
     async function checkSync() {
@@ -108,9 +121,9 @@ export default function GamePage() {
     loadConfig().then(initLocalGame)
   }, [loadConfig, initLocalGame])
 
-  // 同步远程状态
   useEffect(() => {
     if (remoteState && !isLocalUpdateRef.current) {
+      // 立即更新关键游戏状态
       if (remoteState.players?.length > 0) setPlayers(remoteState.players)
       setCurrentPlayerIndex(remoteState.currentPlayerIndex)
       setCanRollAgain(remoteState.canRollAgain)
@@ -147,13 +160,13 @@ export default function GamePage() {
           cells,
           endpointCells,
           timer: timerState,
+          version: 1,
         }
         pushState(state)
       }
     }
   }, [roomConfig, roomId, gameStarted, players.length, cells, endpointCells, timerState, pushState])
 
-  // 推送状态到服务器
   const syncState = useCallback(() => {
     if (!roomId || !gameStarted) return
 
@@ -195,6 +208,7 @@ export default function GamePage() {
         cells: board,
         endpointCells: epCells,
         timer: { duration: 60, timeLeft: 60, isRunning: false },
+        version: 0,
       }
 
       const res = await fetch("/api/room", {
@@ -304,9 +318,9 @@ export default function GamePage() {
     [getCellContent],
   )
 
-  // 投掷骰子
   const handleDiceRoll = (value: number) => {
     if (players.length === 0) return
+    if (!isMyTurn && roomId) return // 多端模式下不是自己的回合时不能投骰子
 
     const currentPlayer = players[currentPlayerIndex]
     if (!currentPlayer) return
@@ -317,7 +331,18 @@ export default function GamePage() {
       updatedPlayers[currentPlayerIndex] = { ...currentPlayer, isSkipped: false }
       setPlayers(updatedPlayers)
       setCurrentPlayerIndex((currentPlayerIndex + 1) % players.length)
-      setTimeout(syncState, 100)
+      setTimeout(() => {
+        isLocalUpdateRef.current = true
+        pushState({
+          players: updatedPlayers,
+          currentPlayerIndex: (currentPlayerIndex + 1) % players.length,
+          canRollAgain: false,
+          winner: null,
+          cells,
+          endpointCells,
+          timer: timerState,
+        })
+      }, 50)
       return
     }
 
@@ -343,10 +368,20 @@ export default function GamePage() {
         task = getCellContentForPlayer(task, currentPlayer.gender, config)
         setCurrentTask(task)
       } else {
-        setCurrentPlayerIndex((currentPlayerIndex + 1) % players.length)
+        const nextIndex = (currentPlayerIndex + 1) % players.length
+        setCurrentPlayerIndex(nextIndex)
+        isLocalUpdateRef.current = true
+        pushState({
+          players: updatedPlayers,
+          currentPlayerIndex: nextIndex,
+          canRollAgain: false,
+          winner: newPos >= totalCells - 1 ? currentPlayer.name : null,
+          cells,
+          endpointCells,
+          timer: timerState,
+        })
       }
       setIsRolling(false)
-      syncState()
     }, 500)
   }
 
@@ -354,10 +389,12 @@ export default function GamePage() {
   const handleTaskComplete = (effect?: GameCell["effect"]) => {
     setCurrentTask(null)
 
-    if (effect && players.length > 0) {
-      const currentPlayer = players[currentPlayerIndex]
-      const updatedPlayers = [...players]
+    const updatedPlayers = [...players]
+    const currentPlayer = players[currentPlayerIndex]
+    let nextIndex = currentPlayerIndex
+    let shouldRollAgain = false
 
+    if (effect && players.length > 0 && currentPlayer) {
       switch (effect.type) {
         case "move":
           if (effect.value) {
@@ -372,26 +409,38 @@ export default function GamePage() {
           setPlayers(updatedPlayers)
           break
         case "again":
+          shouldRollAgain = true
           setCanRollAgain(true)
           setIsRolling(false)
-          setTimeout(syncState, 100)
-          return
+          break
         case "swap":
           // 与下一个玩家交换位置
-          const nextIndex = (currentPlayerIndex + 1) % players.length
+          const swapIndex = (currentPlayerIndex + 1) % players.length
           const tempPos = currentPlayer.position
-          updatedPlayers[currentPlayerIndex] = { ...currentPlayer, position: players[nextIndex].position }
-          updatedPlayers[nextIndex] = { ...players[nextIndex], position: tempPos }
+          updatedPlayers[currentPlayerIndex] = { ...currentPlayer, position: players[swapIndex].position }
+          updatedPlayers[swapIndex] = { ...players[swapIndex], position: tempPos }
           setPlayers(updatedPlayers)
           break
       }
     }
 
-    if (!winner && !canRollAgain) {
-      setCurrentPlayerIndex((currentPlayerIndex + 1) % players.length)
+    if (!winner && !shouldRollAgain) {
+      nextIndex = (currentPlayerIndex + 1) % players.length
+      setCurrentPlayerIndex(nextIndex)
     }
 
-    setTimeout(syncState, 100)
+    setTimeout(() => {
+      isLocalUpdateRef.current = true
+      pushState({
+        players: updatedPlayers,
+        currentPlayerIndex: shouldRollAgain ? currentPlayerIndex : nextIndex,
+        canRollAgain: shouldRollAgain,
+        winner,
+        cells,
+        endpointCells,
+        timer: timerState,
+      })
+    }, 50)
   }
 
   // 重新开始
@@ -410,21 +459,40 @@ export default function GamePage() {
       setCells(board)
       setEndpointCells(epCells)
 
-      setTimeout(syncState, 100)
+      setTimeout(() => {
+        isLocalUpdateRef.current = true
+        pushState({
+          players: resetPlayers,
+          currentPlayerIndex: 0,
+          canRollAgain: false,
+          winner: null,
+          cells: board,
+          endpointCells: epCells,
+          timer: { duration: 60, timeLeft: 60, isRunning: false },
+        })
+      }, 50)
     } else {
       initLocalGame(config)
     }
   }
 
-  // 计时器状态改变
   const handleTimerChange = useCallback(
     (state: TimerState) => {
       setTimerState(state)
       if (roomId && gameStarted) {
-        setTimeout(syncState, 100)
+        isLocalUpdateRef.current = true
+        pushState({
+          players,
+          currentPlayerIndex,
+          canRollAgain,
+          winner,
+          cells,
+          endpointCells,
+          timer: state,
+        })
       }
     },
-    [roomId, gameStarted, syncState],
+    [roomId, gameStarted, players, currentPlayerIndex, canRollAgain, winner, cells, endpointCells, pushState],
   )
 
   // 计算玩家位置
@@ -590,6 +658,7 @@ export default function GamePage() {
                   <Dice
                     onRoll={handleDiceRoll}
                     disabled={isRolling || !!currentTask || !!winner || players.length === 0}
+                    isMyTurn={isMyTurn}
                   />
                 </div>
               </div>
@@ -671,7 +740,13 @@ export default function GamePage() {
 
       {/* Modals */}
       {currentTask && (
-        <TaskModal cell={currentTask} onComplete={handleTaskComplete} playerName={currentPlayer?.name || "玩家"} />
+        <TaskModal
+          cell={currentTask}
+          onComplete={handleTaskComplete}
+          playerName={currentPlayer?.name || "玩家"}
+          playerGender={currentPlayerGender}
+          config={config}
+        />
       )}
 
       {showConfig && <ConfigModal config={config} onSave={handleConfigSave} onClose={() => setShowConfig(false)} />}

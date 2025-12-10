@@ -16,6 +16,8 @@ export interface TimerState {
   duration: number
   timeLeft: number
   isRunning: boolean
+  startedAt?: number // 计时器启动的时间戳
+  pausedAt?: number // 计时器暂停的时间戳
 }
 
 export interface SyncState {
@@ -27,6 +29,7 @@ export interface SyncState {
   endpointCells: GameCell[]
   timer: TimerState
   lastUpdate?: number
+  version?: number
 }
 
 export interface RoomConfig {
@@ -47,6 +50,7 @@ export function useGameSync(roomId: string | null, enabled: boolean) {
   const [remoteState, setRemoteState] = useState<SyncState | null>(null)
   const [roomConfig, setRoomConfig] = useState<RoomConfig | null>(null)
   const lastUpdateRef = useRef(0)
+  const versionRef = useRef(0)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const fetchState = useCallback(async () => {
@@ -65,8 +69,10 @@ export function useGameSync(roomId: string | null, enabled: boolean) {
       setIsConnected(true)
 
       if (data.state) {
-        if (data.state.lastUpdate > lastUpdateRef.current) {
+        const serverVersion = data.state.version || 0
+        if (serverVersion > versionRef.current || data.state.lastUpdate > lastUpdateRef.current) {
           lastUpdateRef.current = data.state.lastUpdate
+          versionRef.current = serverVersion
           setRemoteState(data.state)
         }
       }
@@ -86,15 +92,19 @@ export function useGameSync(roomId: string | null, enabled: boolean) {
 
       try {
         setIsSyncing(true)
+        const newVersion = versionRef.current + 1
+        const stateWithVersion = { ...state, version: newVersion }
+
         const res = await fetch("/api/game-sync", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ roomId, state }),
+          body: JSON.stringify({ roomId, state: stateWithVersion }),
         })
 
         if (res.ok) {
           const data = await res.json()
           lastUpdateRef.current = data.lastUpdate
+          versionRef.current = newVersion
           setIsConnected(true)
         } else {
           setIsConnected(false)
@@ -136,7 +146,7 @@ export function useGameSync(roomId: string | null, enabled: boolean) {
 
     fetchState()
 
-    intervalRef.current = setInterval(fetchState, 800)
+    intervalRef.current = setInterval(fetchState, 500)
 
     return () => {
       if (intervalRef.current) {
