@@ -2,7 +2,7 @@ export type CellType =
   | "normal"
   | "start"
   | "end"
-  | "endpoint-zone"
+  | "endpoint"
   | "forward" // 前进格
   | "backward" // 后退格
   | "skip" // 停一轮
@@ -202,12 +202,12 @@ export const defaultEffectCells: GameCell[] = [
 
 // 终点区域专属内容
 export const defaultEndpointCells: GameCell[] = [
-  { id: 801, content: "最后冲刺！深情亲吻5秒", type: "endpoint-zone", player: "both" },
-  { id: 802, content: "深情告白30秒", type: "endpoint-zone", player: "both" },
-  { id: 803, content: "紧紧拥抱1分钟", type: "endpoint-zone", player: "both" },
-  { id: 804, content: "为对方按摩2分钟", type: "endpoint-zone", player: "both" },
-  { id: 805, content: "说出今晚最想做的事", type: "endpoint-zone", player: "both" },
-  { id: 806, content: "法式深吻30秒", type: "endpoint-zone", player: "both" },
+  { id: 801, content: "最后冲刺！深情亲吻5秒", type: "endpoint", player: "both" },
+  { id: 802, content: "深情告白30秒", type: "endpoint", player: "both" },
+  { id: 803, content: "紧紧拥抱1分钟", type: "endpoint", player: "both" },
+  { id: 804, content: "为对方按摩2分钟", type: "endpoint", player: "both" },
+  { id: 805, content: "说出今晚最想做的事", type: "endpoint", player: "both" },
+  { id: 806, content: "法式深吻30秒", type: "endpoint", player: "both" },
 ]
 
 export const defaultEndpointContent = {
@@ -215,6 +215,54 @@ export const defaultEndpointContent = {
   subtitle: "恭喜到达！",
   reward: "赢家可以提一个要求对方必须答应",
 }
+
+// 场景卡相关配置
+export interface SceneCard {
+  id: number
+  title: string
+  description: string
+  icon?: string
+  pool: string // 添加 pool 属性指定属于哪个卡池
+}
+
+export const defaultSceneCardPoolNames: string[] = ["氛围类", "互动规则", "效果增强"]
+
+export const defaultSceneCards: SceneCard[] = [
+  // 氛围类
+  {
+    id: 101,
+    title: "浪漫烛光",
+    description: "关掉灯，点上蜡烛或打开手机手电筒营造浪漫氛围",
+    icon: "🕯️",
+    pool: "氛围类",
+  },
+  { id: 102, title: "背景音乐", description: "播放一首浪漫的情歌作为背景音乐", icon: "🎵", pool: "氛围类" },
+  { id: 103, title: "星空投影", description: "打开星空投影灯或手机星空壁纸营造梦幻氛围", icon: "✨", pool: "氛围类" },
+  { id: 104, title: "香氛弥漫", description: "点上香薰或喷洒香水，让空气充满浪漫气息", icon: "🌸", pool: "氛围类" },
+  // 互动规则
+  { id: 201, title: "眼神交流", description: "每次完成任务前，先深情对视10秒", icon: "👀", pool: "互动规则" },
+  { id: 202, title: "甜言蜜语", description: "每次轮到自己时，先对对方说一句情话", icon: "💬", pool: "互动规则" },
+  { id: 203, title: "肢体接触", description: "游戏过程中双方必须保持手牵手", icon: "🤝", pool: "互动规则" },
+  {
+    id: 204,
+    title: "角色扮演",
+    description: "接下来的任务中，双方要用角色扮演的方式完成",
+    icon: "🎭",
+    pool: "互动规则",
+  },
+  { id: 205, title: "禁止说话", description: "接下来3轮内只能用肢体语言交流", icon: "🤫", pool: "互动规则" },
+  // 效果增强
+  { id: 301, title: "惩罚加倍", description: "所有惩罚格子的效果翻倍", icon: "⚡", pool: "效果增强" },
+  { id: 302, title: "奖励加倍", description: "所有奖励格子的效果翻倍", icon: "🎁", pool: "效果增强" },
+  { id: 303, title: "亲密升级", description: "所有亲亲抱抱任务时间延长一倍", icon: "💕", pool: "效果增强" },
+  { id: 304, title: "真心时刻", description: "每次完成任务后要说一件喜欢对方的事", icon: "❤️", pool: "效果增强" },
+  { id: 305, title: "服装要求", description: "选择一件对方喜欢的衣服穿上继续游戏", icon: "👗", pool: "效果增强" },
+]
+
+// 兼容旧格式的转换函数
+export const defaultSceneCardPools: SceneCard[][] = defaultSceneCardPoolNames.map((poolName) =>
+  defaultSceneCards.filter((card) => card.pool === poolName),
+)
 
 // 完整的游戏配置
 export interface GameConfig {
@@ -230,8 +278,13 @@ export interface GameConfig {
   effectCells: GameCell[]
   endpointCells: GameCell[]
   endpointContent: typeof defaultEndpointContent
-  boardSize: number // 棋盘总格子数（不含起点终点）
-  specialCellPositions: { [position: number]: CellType } // 特殊格子固定位置
+  boardSize: number
+  specialCellPositions: { [position: number]: CellType }
+  sceneCardPoolNames: string[] // 卡池名称列表
+  sceneCards: SceneCard[] // 所有场景卡，每张卡有pool属性
+  sceneCardCount: number // 游戏开始时抽取的场景卡数量（每个卡池抽一张）
+  // 保留兼容旧格式
+  sceneCardPools?: SceneCard[][]
 }
 
 export const defaultGameConfig: GameConfig = {
@@ -247,9 +300,8 @@ export const defaultGameConfig: GameConfig = {
   effectCells: defaultEffectCells,
   endpointCells: defaultEndpointCells,
   endpointContent: defaultEndpointContent,
-  boardSize: 48, // 更大的棋盘
+  boardSize: 48,
   specialCellPositions: {
-    // 固定某些位置为特殊格子类型
     5: "truth",
     10: "forward",
     15: "dare",
@@ -264,6 +316,9 @@ export const defaultGameConfig: GameConfig = {
     42: "swap",
     45: "kiss",
   },
+  sceneCardPoolNames: defaultSceneCardPoolNames,
+  sceneCards: defaultSceneCards,
+  sceneCardCount: 3,
 }
 
 export function shuffleArray<T>(array: T[]): T[] {
@@ -281,7 +336,7 @@ export function generateBoard(config: GameConfig): GameCell[] {
 
   // 准备各类型格子的池
   const pools: { [key in CellType]?: GameCell[] } = {
-    normal: shuffleArray([...config.normalCells, ...config.maleCells, ...config.femaleCells]),
+    normal: shuffleArray([...config.normalCells]),
     truth: shuffleArray([...config.truthCells]),
     dare: shuffleArray([...config.dareCells]),
     kiss: shuffleArray([...config.kissCells]),
@@ -333,7 +388,7 @@ export function generateBoard(config: GameConfig): GameCell[] {
         cell = getFromPool("kiss")
       } else if (random < 0.9) {
         cell = getFromPool("hug")
-      } else if (random < 0.95) {
+      } else if (random < 0.98) {
         cell = getFromPool("reward")
       } else {
         cell = getFromPool("punishment")

@@ -63,7 +63,7 @@ const getCellTypeInfo = (type: CellType) => {
     punishment: "bg-orange-100 text-orange-700",
     swap: "bg-indigo-100 text-indigo-700",
     normal: "bg-amber-100 text-amber-700",
-    "endpoint-zone": "bg-gradient-to-br from-orange-100 to-amber-100 text-orange-700",
+    "endpoint": "bg-gradient-to-br from-orange-100 to-amber-100 text-orange-700",
   }
 
   return {

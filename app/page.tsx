@@ -7,13 +7,26 @@ import { PlayerPanel } from "@/components/player-panel"
 import { TaskModal } from "@/components/task-modal"
 import { ConfigModal } from "@/components/config-modal"
 import { WinnerModal } from "@/components/winner-modal"
-import { GameTimer } from "@/components/game-timer"
 import { RoomManager } from "@/components/room-manager"
 import { SyncIndicator } from "@/components/sync-indicator"
-import { useGameSync, type SyncState } from "@/hooks/use-game-sync"
-import { type GameCell, type GameConfig, defaultGameConfig, shuffleArray, generateBoard } from "@/lib/game-data"
+import { GameTimer } from "@/components/game-timer"
+import { SceneCardDraw } from "@/components/scene-card-draw"
+import { SceneCardViewer } from "@/components/scene-card-viewer"
+import {
+  type GameConfig,
+  type GameCell,
+  generateBoard,
+  defaultGameConfig,
+  shuffleArray,
+  type GenderType,
+  type SceneCard,
+  defaultSceneCardPoolNames,
+  defaultSceneCards,
+} from "@/lib/game-data"
 import { Button } from "@/components/ui/button"
-import { Settings, RotateCcw, Heart, Loader2 } from "lucide-react"
+import { Heart, RotateCcw, Settings, Layers } from "lucide-react"
+import { useGameSync, type SyncState } from "@/hooks/use-game-sync"
+import { Loader2 } from "lucide-react" // Import Loader2
 
 export default function GamePage() {
   const [config, setConfig] = useState<GameConfig>(defaultGameConfig)
@@ -23,10 +36,12 @@ export default function GamePage() {
   const [player1Position, setPlayer1Position] = useState(0)
   const [player2Position, setPlayer2Position] = useState(0)
   const [currentPlayer, setCurrentPlayer] = useState<1 | 2>(1)
+  // 骰子值状态
+  const [diceValue, setDiceValue] = useState(1)
   const [currentTask, setCurrentTask] = useState<GameCell | null>(null)
-  const [currentTaskIndex, setCurrentTaskIndex] = useState<number | null>(null)
+  // 获胜者状态类型
+  const [winner, setWinner] = useState<1 | 2 | null>(null)
   const [showConfig, setShowConfig] = useState(false)
-  const [winner, setWinner] = useState<string | null>(null)
   const [isRolling, setIsRolling] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [skipNextTurn, setSkipNextTurn] = useState<{ player1: boolean; player2: boolean }>({
@@ -42,24 +57,31 @@ export default function GamePage() {
   const [isWaitingForPlayer2, setIsWaitingForPlayer2] = useState(false)
   const [player2Joined, setPlayer2Joined] = useState(false)
   const [isHost, setIsHost] = useState(false)
-  const isLocalUpdateRef = useRef(false)
+  // myPlayerNumber
+  const [myPlayerNumber, setMyPlayerNumber] = useState<1 | 2 | null>(null)
 
-  const [player1Gender, setPlayer1Gender] = useState<"male" | "female">("male")
-  const [player2Gender, setPlayer2Gender] = useState<"male" | "female">("female")
+  const [player1Gender, setPlayer1Gender] = useState<GenderType>("male")
+  const [player2Gender, setPlayer2Gender] = useState<GenderType>("female")
 
   const [timerSeconds, setTimerSeconds] = useState(60)
   const [timerRunning, setTimerRunning] = useState(false)
   const [timerDuration, setTimerDuration] = useState(60)
 
   const [taskChangedCells, setTaskChangedCells] = useState<{ [cellIndex: number]: boolean }>({})
-  const [myPlayerNumber, setMyPlayerNumber] = useState<1 | 2 | null>(null)
+
+  const [drawnSceneCards, setDrawnSceneCards] = useState<SceneCard[]>([])
+  const [showSceneCardDraw, setShowSceneCardDraw] = useState(false)
+  const [showSceneCardViewer, setShowSceneCardViewer] = useState(false)
+  const [sceneCardsDrawn, setSceneCardsDrawn] = useState(false)
+
+  const isLocalUpdateRef = useRef(false)
 
   const { isSyncing, isConnected, remoteState, pushState, setRemoteState, fetchStateImmediately } = useGameSync(
     roomId,
     !!roomId && gameStarted,
   )
 
-  const totalCells = cells.length + endpointCells.length + 2
+  const totalCells = config.boardSize + 2
 
   useEffect(() => {
     async function checkSync() {
@@ -102,26 +124,38 @@ export default function GamePage() {
     setCurrentPlayer(1)
     setWinner(null)
     setCurrentTask(null)
-    setCurrentTaskIndex(null)
+    // currentTaskIndex no longer needed
+    // setCurrentTaskIndex(null)
     setSkipNextTurn({ player1: false, player2: false })
     setCanRollAgain(false)
     setIsLoading(false)
     setTaskChangedCells({})
+    // Reset scene card states
+    setDrawnSceneCards([])
+    setSceneCardsDrawn(false)
   }, [])
 
   useEffect(() => {
     loadConfig().then(initGame)
   }, [loadConfig, initGame])
 
+  // Generate board and shuffle endpoint cells when config changes
+  // useEffect(() => {
+  //   const newBoard = generateBoard(config)
+  //   setCells(newBoard)
+  //   const shuffledEndpoint = shuffleArray([...config.endpointCells])
+  //   setEndpointCells(shuffledEndpoint)
+  // }, [config])
+
   useEffect(() => {
     if (remoteState) {
       // Always apply remote state - server is the source of truth
-      setPlayer1Position(remoteState.player1Position)
-      setPlayer2Position(remoteState.player2Position)
-      setCurrentPlayer(remoteState.currentPlayer)
-      setSkipNextTurn(remoteState.skipNextTurn)
-      setCanRollAgain(remoteState.canRollAgain)
-      setWinner(remoteState.winner)
+      setPlayer1Position(remoteState.player1Position ?? player1Position)
+      setPlayer2Position(remoteState.player2Position ?? player2Position)
+      setCurrentPlayer(remoteState.currentPlayer ?? currentPlayer)
+      setSkipNextTurn(remoteState.skipNextTurn ?? skipNextTurn)
+      setCanRollAgain(remoteState.canRollAgain ?? canRollAgain)
+      setWinner(remoteState.winner ?? winner)
       if (remoteState.cells && remoteState.cells.length > 0) setCells(remoteState.cells)
       if (remoteState.endpointCells && remoteState.endpointCells.length > 0) setEndpointCells(remoteState.endpointCells)
       if (remoteState.timerSeconds !== undefined) setTimerSeconds(remoteState.timerSeconds)
@@ -130,15 +164,12 @@ export default function GamePage() {
       if (remoteState.player1Gender) setPlayer1Gender(remoteState.player1Gender)
       if (remoteState.player2Gender) setPlayer2Gender(remoteState.player2Gender)
       if (remoteState.taskChangedCells) setTaskChangedCells(remoteState.taskChangedCells)
-      if (remoteState.player2Joined !== undefined) {
-        setPlayer2Joined(remoteState.player2Joined)
-        if (remoteState.player2Joined) {
-          setIsWaitingForPlayer2(false)
-        }
-      }
+      if (remoteState.player2Joined !== undefined) setPlayer2Joined(remoteState.player2Joined)
       if (remoteState.config) {
         setConfig(remoteState.config)
       }
+      if (remoteState.drawnSceneCards) setDrawnSceneCards(remoteState.drawnSceneCards)
+      if (remoteState.sceneCardsDrawn !== undefined) setSceneCardsDrawn(remoteState.sceneCardsDrawn)
     }
   }, [remoteState])
 
@@ -166,6 +197,8 @@ export default function GamePage() {
         taskChangedCells: overrides.taskChangedCells ?? taskChangedCells,
         player2Joined: overrides.player2Joined ?? player2Joined,
         config: overrides.config ?? config,
+        drawnSceneCards: overrides.drawnSceneCards ?? drawnSceneCards,
+        sceneCardsDrawn: overrides.sceneCardsDrawn ?? sceneCardsDrawn,
       }
 
       pushState(finalState)
@@ -189,6 +222,8 @@ export default function GamePage() {
       taskChangedCells,
       player2Joined,
       config,
+      drawnSceneCards,
+      sceneCardsDrawn,
       pushState,
     ],
   )
@@ -196,6 +231,47 @@ export default function GamePage() {
   const syncState = useCallback(() => {
     syncStateWithOverrides({})
   }, [syncStateWithOverrides])
+
+  const drawSceneCards = useCallback(() => {
+    const poolNames = config.sceneCardPoolNames || defaultSceneCardPoolNames
+    const cards = config.sceneCards || defaultSceneCards
+    const count = config.sceneCardCount ?? 3
+
+    if (count === 0 || poolNames.length === 0) {
+      setSceneCardsDrawn(true)
+      return
+    }
+
+    // 从前N个卡池各抽一张
+    const drawn: SceneCard[] = []
+    for (let i = 0; i < Math.min(count, poolNames.length); i++) {
+      const poolName = poolNames[i]
+      const poolCards = cards.filter((c) => c.pool === poolName)
+      if (poolCards.length > 0) {
+        const shuffled = shuffleArray([...poolCards])
+        drawn.push(shuffled[0])
+      }
+    }
+
+    if (drawn.length === 0) {
+      setSceneCardsDrawn(true)
+      return
+    }
+
+    setDrawnSceneCards(drawn)
+    setShowSceneCardDraw(true)
+  }, [config.sceneCardPoolNames, config.sceneCards, config.sceneCardCount])
+
+  const handleSceneCardDrawComplete = useCallback(() => {
+    setShowSceneCardDraw(false)
+    setSceneCardsDrawn(true)
+    if (roomId) {
+      syncStateWithOverrides({
+        drawnSceneCards,
+        sceneCardsDrawn: true,
+      })
+    }
+  }, [roomId, drawnSceneCards, syncStateWithOverrides])
 
   const handleCreateRoom = async (selectedGender: "male" | "female"): Promise<string | null> => {
     try {
@@ -206,6 +282,22 @@ export default function GamePage() {
       setPlayer2Gender(p2Gender)
       setIsHost(true)
       setMyPlayerNumber(1)
+
+      const poolNames = config.sceneCardPoolNames || defaultSceneCardPoolNames
+      const cards = config.sceneCards || defaultSceneCards
+      const count = config.sceneCardCount ?? 3
+      const drawn: SceneCard[] = []
+
+      for (let i = 0; i < Math.min(count, poolNames.length); i++) {
+        const poolName = poolNames[i]
+        const poolCards = cards.filter((c) => c.pool === poolName)
+        if (poolCards.length > 0) {
+          const shuffled = shuffleArray([...poolCards])
+          drawn.push(shuffled[0])
+        }
+      }
+
+      setDrawnSceneCards(drawn)
 
       const state: SyncState = {
         player1Position: 0,
@@ -225,6 +317,9 @@ export default function GamePage() {
         taskChangedCells: {},
         player2Joined: false,
         config: config,
+        nextPlayerNumber: 2,
+        drawnSceneCards: drawn,
+        sceneCardsDrawn: false,
       }
 
       const res = await fetch("/api/room", {
@@ -253,6 +348,14 @@ export default function GamePage() {
       const data = await res.json()
 
       if (data.exists && data.state) {
+        const state = data.state
+
+        // Assign player number based on nextPlayerNumber
+        const assignedPlayerNumber = state.nextPlayerNumber || 2
+        setMyPlayerNumber(assignedPlayerNumber as 1 | 2)
+
+        const newNextPlayerNumber = assignedPlayerNumber === 1 ? 2 : 1
+
         setRoomId(id.toUpperCase())
         setRemoteState(data.state)
         setPlayer1Position(data.state.player1Position)
@@ -272,16 +375,19 @@ export default function GamePage() {
         if (data.state.config) {
           setConfig(data.state.config)
         }
+        if (data.state.drawnSceneCards) setDrawnSceneCards(data.state.drawnSceneCards)
+        if (data.state.sceneCardsDrawn !== undefined) setSceneCardsDrawn(data.state.sceneCardsDrawn)
+
         setGameStarted(true)
         setPlayer2Joined(true)
         setIsWaitingForPlayer2(false)
         setIsHost(false)
-        setMyPlayerNumber(2)
 
         // 通知房主玩家2已加入
         const updatedState: SyncState = {
           ...data.state,
           player2Joined: true,
+          nextPlayerNumber: newNextPlayerNumber, // Update next player number
         }
         await fetch("/api/game-sync", {
           method: "POST",
@@ -299,26 +405,37 @@ export default function GamePage() {
 
   const handleCheckPlayer2Joined = async (): Promise<boolean> => {
     if (!roomId) return false
-    const state = await fetchStateImmediately()
-    if (state && state.player2Joined) {
-      setPlayer2Joined(true)
-      setIsWaitingForPlayer2(false)
-      return true
+    try {
+      const res = await fetch(`/api/room?roomId=${roomId}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.state?.player2Joined) {
+          setPlayer2Joined(true)
+          setIsWaitingForPlayer2(false)
+          if (!sceneCardsDrawn && drawnSceneCards.length > 0) {
+            setShowSceneCardDraw(true)
+          }
+          return true
+        }
+      }
+    } catch (error) {
+      console.error("检查玩家2状态失败:", error)
     }
     return false
   }
 
   const handlePlayLocal = () => {
-    setRoomId(null)
+    setSyncEnabled(false)
     setGameStarted(true)
-    setPlayer2Joined(true)
-    setIsWaitingForPlayer2(false)
+    setMyPlayerNumber(null)
+    drawSceneCards()
   }
 
-  const handleConfigSave = (newConfig: GameConfig) => {
-    setConfig(newConfig)
-    initGame(newConfig)
-  }
+  useEffect(() => {
+    if (player2Joined && !sceneCardsDrawn && drawnSceneCards.length > 0 && !showSceneCardDraw) {
+      setShowSceneCardDraw(true)
+    }
+  }, [player2Joined, sceneCardsDrawn, drawnSceneCards, showSceneCardDraw])
 
   const getCellContent = useCallback(
     (index: number): GameCell | null => {
@@ -340,16 +457,6 @@ export default function GamePage() {
       return null
     },
     [cells, endpointCells, totalCells],
-  )
-
-  const handleCellClick = useCallback(
-    (index: number) => {
-      const cell = getCellContent(index)
-      if (cell) {
-        setPreviewCell({ cell, index })
-      }
-    },
-    [getCellContent],
   )
 
   const getCurrentPlayerGender = useCallback(() => {
@@ -405,82 +512,96 @@ export default function GamePage() {
   )
 
   const handleTaskChange = useCallback(
-    (newCell: GameCell) => {
-      if (currentTaskIndex !== null) {
-        setCurrentTask(newCell)
-        setTaskChangedCells((prev) => ({ ...prev, [currentTaskIndex]: true }))
+    (cellId: number, newTask: GameCell) => {
+      setCurrentTask(newTask)
+      const newTaskChangedCells = { ...taskChangedCells, [cellId]: true }
+      setTaskChangedCells(newTaskChangedCells)
+      if (roomId) {
+        syncStateWithOverrides({ taskChangedCells: newTaskChangedCells })
       }
     },
-    [currentTaskIndex],
+    [taskChangedCells, roomId, syncStateWithOverrides],
   )
 
-  const handleDiceRoll = (value: number) => {
-    // In online mode, turn control is handled by canCurrentDeviceRoll which checks currentPlayer === myPlayerNumber
-    if (isRolling) return
+  const handleDiceRoll = useCallback(
+    (value: number) => {
+      if (isRolling || winner) return
 
-    const skipKey = currentPlayer === 1 ? "player1" : "player2"
-    if (skipNextTurn[skipKey]) {
-      setSkipNextTurn((prev) => ({ ...prev, [skipKey]: false }))
-      const nextPlayer = currentPlayer === 1 ? 2 : 1
-      setCurrentPlayer(nextPlayer)
-      setTimeout(() => syncStateWithOverrides({ currentPlayer: nextPlayer }), 100)
-      return
-    }
+      setIsRolling(true)
+      const currentPos = currentPlayer === 1 ? player1Position : player2Position
+      const newPos = Math.min(currentPos + value, totalCells - 1)
 
-    setIsRolling(true)
-    setCanRollAgain(false)
-    setPreviewCell(null)
+      const updatePosition = currentPlayer === 1 ? setPlayer1Position : setPlayer2Position
+      updatePosition(newPos)
 
-    if (roomId && gameStarted) {
-      syncStateWithOverrides({})
-    }
+      setDiceValue(value)
 
-    const currentPos = currentPlayer === 1 ? player1Position : player2Position
-    let newPos = currentPos + value
+      setTimeout(() => {
+        // Check for winner
+        if (newPos >= totalCells - 1) {
+          setWinner(currentPlayer)
+          setIsRolling(false)
+          syncStateWithOverrides({ isRolling: false })
+          return
+        }
 
-    if (newPos >= totalCells - 1) {
-      newPos = totalCells - 1
-      const winnerName =
-        currentPlayer === 1
-          ? `玩家1 (${player1Gender === "male" ? "♂" : "♀"})`
-          : `玩家2 (${player2Gender === "male" ? "♂" : "♀"})`
-      setWinner(winnerName)
-    }
+        // Use current player gender to get appropriate task
+        const currentGender = currentPlayer === 1 ? player1Gender : player2Gender
+        const task = getCellContent(newPos)
 
-    const newPlayer1Position = currentPlayer === 1 ? newPos : player1Position
-    const newPlayer2Position = currentPlayer === 2 ? newPos : player2Position
+        if (task && !winner) {
+          // Handle effects
+          if (task.effect) {
+            if (task.effect.type === "move" && task.effect.value) {
+              if (task.effect.value === -999) {
+                updatePosition(1)
+              } else {
+                const effectPos = Math.max(1, Math.min(newPos + task.effect.value, totalCells - 1))
+                updatePosition(effectPos)
+              }
+            } else if (task.effect.type === "swap") {
+              const otherPos = currentPlayer === 1 ? player2Position : player1Position
+              updatePosition(otherPos)
+              if (currentPlayer === 1) {
+                setPlayer2Position(newPos)
+              } else {
+                setPlayer1Position(newPos)
+              }
+            }
+          }
 
-    if (currentPlayer === 1) {
-      setPlayer1Position(newPos)
-    } else {
-      setPlayer2Position(newPos)
-    }
-
-    setTimeout(() => {
-      const task = getCellContent(newPos)
-      if (task && !winner) {
-        setCurrentTask(task)
-        setCurrentTaskIndex(newPos)
-        syncStateWithOverrides({
-          player1Position: newPlayer1Position,
-          player2Position: newPlayer2Position,
-        })
-      } else {
-        const nextPlayer = currentPlayer === 1 ? 2 : 1
-        setCurrentPlayer(nextPlayer)
-        setIsRolling(false)
-        syncStateWithOverrides({
-          currentPlayer: nextPlayer,
-          player1Position: newPlayer1Position,
-          player2Position: newPlayer2Position,
-        })
-      }
-    }, 500)
-  }
+          setCurrentTask(task)
+          syncStateWithOverrides({ isRolling: true })
+        } else {
+          // No task, switch player
+          setIsRolling(false)
+          const newCurrentPlayer = currentPlayer === 1 ? 2 : 1
+          setCurrentPlayer(newCurrentPlayer)
+          syncStateWithOverrides({
+            currentPlayer: newCurrentPlayer,
+            isRolling: false,
+          })
+        }
+      }, 500)
+    },
+    [
+      isRolling,
+      winner,
+      currentPlayer,
+      player1Position,
+      player2Position,
+      totalCells,
+      getCellContent,
+      syncStateWithOverrides,
+      player1Gender,
+      player2Gender,
+    ],
+  )
 
   const handleTaskComplete = (effect?: GameCell["effect"]) => {
     setCurrentTask(null)
-    setCurrentTaskIndex(null)
+    // currentTaskIndex no longer needed
+    // setCurrentTaskIndex(null)
     setIsRolling(false)
 
     let newPlayer1Position = player1Position
@@ -532,13 +653,13 @@ export default function GamePage() {
     }
 
     if (!winner && !canRollAgain && !shouldRollAgain) {
-      const nextPlayer = currentPlayer === 1 ? 2 : 1
-      setCurrentPlayer(nextPlayer)
+      const newCurrentPlayer = currentPlayer === 1 ? 2 : 1
+      setCurrentPlayer(newCurrentPlayer)
       setIsRolling(false)
       setTimeout(
         () =>
           syncStateWithOverrides({
-            currentPlayer: nextPlayer,
+            currentPlayer: newCurrentPlayer,
             player1Position: newPlayer1Position,
             player2Position: newPlayer2Position,
           }),
@@ -559,20 +680,105 @@ export default function GamePage() {
 
   const handleRestart = () => {
     initGame(config)
-    setTimeout(syncState, 100)
+    // Reset scene card states and re-sync if in a room
+    const newBoard = generateBoard(config)
+    setCells(newBoard)
+    const shuffledEndpoint = shuffleArray([...config.endpointCells])
+    setEndpointCells(shuffledEndpoint)
+    setPlayer1Position(0)
+    setPlayer2Position(0)
+    setCurrentPlayer(1)
+    setDiceValue(1)
+    setWinner(null)
+    setSkipNextTurn({ player1: false, player2: false })
+    setCanRollAgain(false)
+    setTaskChangedCells({})
+    // Reset scene card states
+    setDrawnSceneCards([])
+    setSceneCardsDrawn(false)
+
+    if (roomId) {
+      // Re-draw scene cards for the new game
+      const poolNames = config.sceneCardPoolNames || defaultSceneCardPoolNames
+      const cards = config.sceneCards || defaultSceneCards
+      const count = config.sceneCardCount ?? 3
+      const drawn: SceneCard[] = []
+
+      for (let i = 0; i < Math.min(count, poolNames.length); i++) {
+        const poolName = poolNames[i]
+        const poolCards = cards.filter((c) => c.pool === poolName)
+        if (poolCards.length > 0) {
+          const shuffled = shuffleArray([...poolCards])
+          drawn.push(shuffled[0])
+        }
+      }
+
+      setDrawnSceneCards(drawn)
+
+      syncStateWithOverrides({
+        player1Position: 0,
+        player2Position: 0,
+        currentPlayer: 1,
+        skipNextTurn: { player1: false, player2: false },
+        canRollAgain: false,
+        winner: null,
+        cells: newBoard,
+        endpointCells: shuffledEndpoint,
+        taskChangedCells: {},
+        drawnSceneCards: drawn,
+        sceneCardsDrawn: false,
+      })
+
+      // Show scene card draw animation after restart
+      if (drawn.length > 0) {
+        setShowSceneCardDraw(true)
+      }
+    } else {
+      // Local mode re-draw
+      drawSceneCards()
+    }
+  }
+
+  const handleConfigSave = (newConfig: GameConfig) => {
+    // 限制 boardSize 在有效范围内
+    const validatedConfig = {
+      ...newConfig,
+      boardSize: Math.min(Math.max(newConfig.boardSize, 20), 56),
+    }
+    setConfig(validatedConfig)
+    if (roomId) {
+      syncStateWithOverrides({ config: validatedConfig })
+    }
+  }
+
+  const handleConfigReset = () => {
+    setConfig(defaultGameConfig)
+    if (roomId) {
+      syncStateWithOverrides({ config: defaultGameConfig })
+    }
   }
 
   const canCurrentDeviceRoll = useCallback(() => {
-    // 本地模式下，任何时候都可以投
+    // Local mode allows rolling anytime
     if (!roomId) return true
-    // 在线模式下，如果正在投掷则不允许
-    if (isRolling) return false
-    // 如果玩家2还没加入，不允许投掷
+    // If player 2 hasn't joined, no one can roll
     if (!player2Joined) return false
-    // 在线模式下，只有当前回合的玩家才能投掷
+    // Online mode: only allow rolling if it's the current player's turn and they are the current device's player number
     if (myPlayerNumber !== null && currentPlayer !== myPlayerNumber) return false
+    // If currently rolling, cannot roll again
+    if (isRolling) return false
     return true
-  }, [roomId, isRolling, player2Joined, myPlayerNumber, currentPlayer])
+  }, [roomId, player2Joined, myPlayerNumber, currentPlayer, isRolling])
+
+  const handleCellClick = useCallback(
+    (index: number) => {
+      const cell = getCellContent(index)
+      if (cell && !taskChangedCells[index]) {
+        setPreviewCell({ cell, index })
+      }
+    },
+    [getCellContent, taskChangedCells],
+  )
 
   if (syncEnabled === null || isLoading) {
     return (
@@ -585,13 +791,14 @@ export default function GamePage() {
     )
   }
 
+  // Waiting for room or game not started
   if (syncEnabled && (!gameStarted || (isWaitingForPlayer2 && !player2Joined))) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-rose-100 via-amber-50 to-pink-100 flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <h1 className="text-2xl md:text-3xl font-bold text-rose-600 text-center mb-6 flex items-center justify-center gap-2">
             <Heart className="w-6 h-6 md:w-8 md:h-8 fill-rose-500" />
-            情侣飞行棋
+            <span className="hidden sm:inline">情侣飞行棋</span>
           </h1>
           <RoomManager
             onCreateRoom={handleCreateRoom}
@@ -618,6 +825,18 @@ export default function GamePage() {
 
           <div className="flex items-center gap-2">
             {roomId && <SyncIndicator roomId={roomId} isSyncing={isSyncing} isConnected={isConnected} />}
+            {drawnSceneCards.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSceneCardViewer(true)}
+                className="bg-white/80 text-xs md:text-sm h-8 px-2 md:px-3"
+              >
+                <Layers className="w-3 h-3 md:w-4 md:h-4 mr-1" />
+                <span className="hidden sm:inline">场景卡</span>
+                <span className="sm:hidden">🎴</span>
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -700,17 +919,34 @@ export default function GamePage() {
             </div>
 
             {previewCell && (
-              <div className="lg:hidden bg-white/90 rounded-xl p-3 shadow-lg border-2 border-amber-300">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-muted-foreground">格子 #{previewCell.index + 1}</span>
-                  <button
-                    onClick={() => setPreviewCell(null)}
-                    className="text-gray-400 hover:text-gray-600 text-lg leading-none"
-                  >
-                    ×
-                  </button>
+              <div className="lg:hidden bg-white/80 rounded-lg p-2">
+                <div className="grid grid-cols-6 gap-1 text-[9px] text-center">
+                  <div className="flex flex-col items-center">
+                    <div className="w-4 h-4 rounded bg-blue-400 mb-0.5" />
+                    <span>真心话</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <div className="w-4 h-4 rounded bg-purple-400 mb-0.5" />
+                    <span>大冒险</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <div className="w-4 h-4 rounded bg-pink-400 mb-0.5" />
+                    <span>亲亲</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <div className="w-4 h-4 rounded bg-green-400 mb-0.5" />
+                    <span>前进</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <div className="w-4 h-4 rounded bg-red-400 mb-0.5" />
+                    <span>后退</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <div className="w-4 h-4 rounded bg-yellow-400 mb-0.5" />
+                    <span>再掷</span>
+                  </div>
                 </div>
-                <p className="text-sm font-medium text-center text-gray-800">{previewCell.cell.content}</p>
+                <p className="text-[10px] text-center text-muted-foreground mt-1">点击格子查看内容</p>
               </div>
             )}
 
@@ -773,22 +1009,34 @@ export default function GamePage() {
       </div>
 
       {/* Modals */}
+      {/* Use task prop and pass alternatives */}
       {currentTask && (
         <TaskModal
           cell={currentTask}
           onComplete={handleTaskComplete}
-          playerName={
-            currentPlayer === 1
-              ? `玩家1 (${player1Gender === "male" ? "♂" : "♀"})`
-              : `玩家2 (${player2Gender === "male" ? "♂" : "♀"})`
-          }
+          playerName={currentPlayer === 1 ? "玩家1" : "玩家2"}
           currentPlayerGender={getCurrentPlayerGender()}
           config={config}
-          cellIndex={currentTaskIndex ?? undefined}
-          canChangeTask={currentTaskIndex !== null && !taskChangedCells[currentTaskIndex]}
-          onTaskChange={handleTaskChange}
+          cellIndex={currentPlayer === 1 ? player1Position : player2Position}
+          canChangeTask={!taskChangedCells[currentPlayer === 1 ? player1Position : player2Position]}
+          onTaskChange={(newCell) => handleTaskChange(currentPlayer === 1 ? player1Position : player2Position, newCell)}
         />
       )}
+
+      {showSceneCardDraw && (
+        <SceneCardDraw
+          isOpen={showSceneCardDraw}
+          onClose={handleSceneCardDrawComplete}
+          poolNames={config.sceneCardPoolNames || defaultSceneCardPoolNames}
+          drawnCards={drawnSceneCards}
+        />
+      )}
+
+      <SceneCardViewer
+        isOpen={showSceneCardViewer}
+        onClose={() => setShowSceneCardViewer(false)}
+        cards={drawnSceneCards}
+      />
 
       {showConfig && (
         <ConfigModal
@@ -796,15 +1044,12 @@ export default function GamePage() {
           config={config}
           onSave={handleConfigSave}
           onClose={() => setShowConfig(false)}
-          onReset={() => {
-            import("@/lib/game-data").then(({ defaultGameConfig }) => {
-              setConfig(defaultGameConfig)
-            })
-          }}
+          onReset={handleConfigReset}
         />
       )}
 
-      {winner && <WinnerModal winner={winner} reward={config.endpointContent.reward} onRestart={handleRestart} />}
+      {/* Winner modal winner type */}
+      {winner !== null && <WinnerModal winner={winner} onRestart={handleRestart} />}
     </main>
   )
 }

@@ -60,7 +60,7 @@ const getCellIcon = (type: CellType) => {
       return <Star className="w-3 h-3 md:w-4 md:h-4" />
     case "end":
       return <Heart className="w-3 h-3 md:w-4 md:h-4 fill-current" />
-    case "endpoint-zone":
+    case "endpoint":
       return <Star className="w-3 h-3 md:w-4 md:h-4" />
     default:
       return null
@@ -78,7 +78,7 @@ const getCellColor = (type: CellType) => {
       return "bg-green-500 border-green-700 text-white"
     case "end":
       return "bg-gradient-to-br from-red-500 to-pink-500 border-red-700 text-white"
-    case "endpoint-zone":
+    case "endpoint":
       return "bg-gradient-to-br from-orange-400 to-amber-500 border-orange-600 text-white"
     case "normal":
       return "bg-amber-100 border-amber-300 text-foreground"
@@ -99,48 +99,79 @@ export function GameBoard({
 }: GameBoardProps) {
   const totalCells = cells.length + endpointCells.length + 2
 
+  const calculateBoardSize = (cellCount: number) => {
+    // 最小 6x5，最大不限制
+    // 外圈能容纳的格子数 = 2*(cols + rows) - 4
+    // 内圈能容纳的格子数 = 2*(cols-2 + rows-2) - 4 = 2*(cols + rows) - 12
+    // 以此类推，每层减少 8 格
+
+    // 从小到大尝试找到合适的尺寸
+    let cols = 6
+    let rows = 5
+
+    const getCapacity = (c: number, r: number) => {
+      let capacity = 0
+      let currentCols = c
+      let currentRows = r
+      while (currentCols >= 4 && currentRows >= 3) {
+        // 每圈的格子数
+        const ringCells = 2 * (currentCols + currentRows) - 4
+        capacity += ringCells
+        currentCols -= 2
+        currentRows -= 2
+      }
+      return capacity
+    }
+
+    // 逐步增大棋盘直到能容纳所有格子
+    while (getCapacity(cols, rows) < cellCount) {
+      // 优先增加列数，保持宽高比
+      if (cols <= rows * 1.5) {
+        cols++
+      } else {
+        rows++
+      }
+      // 安全限制
+      if (cols > 20 || rows > 15) break
+    }
+
+    return { cols, rows }
+  }
+
+  const { cols, rows } = calculateBoardSize(totalCells)
+
   const getBoardLayout = () => {
     const layout: { row: number; col: number; index: number }[] = []
-    const cols = 10
-    const rows = 8
     let index = 0
+    let currentCols = cols
+    let currentRows = rows
+    let offsetCol = 0
+    let offsetRow = 0
 
-    // 外圈 - 顺时针
-    // 顶行 (左到右)
-    for (let col = 0; col < cols && index < totalCells; col++) {
-      layout.push({ row: 0, col, index: index++ })
-    }
-    // 右列 (上到下)
-    for (let row = 1; row < rows && index < totalCells; row++) {
-      layout.push({ row, col: cols - 1, index: index++ })
-    }
-    // 底行 (右到左)
-    for (let col = cols - 2; col >= 0 && index < totalCells; col--) {
-      layout.push({ row: rows - 1, col, index: index++ })
-    }
-    // 左列 (下到上)
-    for (let row = rows - 2; row > 0 && index < totalCells; row--) {
-      layout.push({ row, col: 0, index: index++ })
-    }
+    // 支持多圈布局
+    while (index < totalCells && currentCols >= 4 && currentRows >= 3) {
+      // 顶行 (左到右)
+      for (let col = offsetCol; col < offsetCol + currentCols && index < totalCells; col++) {
+        layout.push({ row: offsetRow, col, index: index++ })
+      }
+      // 右列 (上到下)
+      for (let row = offsetRow + 1; row < offsetRow + currentRows && index < totalCells; row++) {
+        layout.push({ row, col: offsetCol + currentCols - 1, index: index++ })
+      }
+      // 底行 (右到左)
+      for (let col = offsetCol + currentCols - 2; col >= offsetCol && index < totalCells; col--) {
+        layout.push({ row: offsetRow + currentRows - 1, col, index: index++ })
+      }
+      // 左列 (下到上)
+      for (let row = offsetRow + currentRows - 2; row > offsetRow && index < totalCells; row--) {
+        layout.push({ row, col: offsetCol, index: index++ })
+      }
 
-    // 内圈 - 继续顺时针（如果格子还没用完）
-    if (index < totalCells) {
-      // 第二行 (左到右)
-      for (let col = 1; col < cols - 1 && index < totalCells; col++) {
-        layout.push({ row: 1, col, index: index++ })
-      }
-      // 倒数第二列 (上到下)
-      for (let row = 2; row < rows - 1 && index < totalCells; row++) {
-        layout.push({ row, col: cols - 2, index: index++ })
-      }
-      // 倒数第二行 (右到左)
-      for (let col = cols - 3; col >= 1 && index < totalCells; col--) {
-        layout.push({ row: rows - 2, col, index: index++ })
-      }
-      // 第二列 (下到上)
-      for (let row = rows - 3; row > 1 && index < totalCells; row--) {
-        layout.push({ row, col: 1, index: index++ })
-      }
+      // 进入内圈
+      offsetCol++
+      offsetRow++
+      currentCols -= 2
+      currentRows -= 2
     }
 
     return layout
@@ -216,10 +247,13 @@ export function GameBoard({
         </div>
       </div>
 
-      {/* Board Grid - 10x8 */}
-      <div className="grid grid-cols-10 gap-[2px] md:gap-1 p-1 md:p-4 bg-gradient-to-br from-amber-100 to-rose-100 rounded-xl md:rounded-2xl shadow-2xl border-2 md:border-4 border-amber-300">
-        {Array.from({ length: 8 }).map((_, row) =>
-          Array.from({ length: 10 }).map((_, col) => {
+      {/* Board Grid - 动态生成 */}
+      <div
+        className="grid gap-[2px] md:gap-1 p-1 md:p-4 bg-gradient-to-br from-amber-100 to-rose-100 rounded-xl md:rounded-2xl shadow-2xl border-2 md:border-4 border-amber-300"
+        style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+      >
+        {Array.from({ length: rows }).map((_, row) =>
+          Array.from({ length: cols }).map((_, col) => {
             const cell = boardLayout.find((c) => c.row === row && c.col === col)
 
             if (!cell) {

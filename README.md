@@ -68,46 +68,46 @@
 推荐使用 Node.js 18 或更高版本。
 
 **Windows:**
-
+\`\`\`bash
 # 下载安装包
 # 访问 https://nodejs.org/ 下载 LTS 版本并安装
-```bash
+
 # 或使用 winget
 winget install OpenJS.NodeJS.LTS
-```
+\`\`\`
 
 **macOS:**
-```bash
+\`\`\`bash
 # 使用 Homebrew
 brew install node@22
-```
+\`\`\`
 
 **Linux (Ubuntu/Debian):**
-```bash
+\`\`\`bash
 # 使用 NodeSource
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt-get install -y nodejs
-```
+\`\`\`
 
 验证安装：
-```bash
+\`\`\`bash
 node -v  # 应显示 v22.x.x 或更高
 npm -v   # 应显示 npm 版本
-```
+\`\`\`
 
 ### 2. 安装 pnpm
 
-```bash
+\`\`\`bash
 # 使用 npm 安装 pnpm
 npm install -g pnpm
 
 # 验证安装
 pnpm -v
-```
+\`\`\`
 
 ### 3. 设置镜像源（国内用户推荐）
 
-```bash
+\`\`\`bash
 # 设置 npm 镜像
 npm config set registry https://registry.npmmirror.com
 
@@ -116,29 +116,29 @@ pnpm config set registry https://registry.npmmirror.com
 
 # 验证镜像设置
 pnpm config get registry
-```
+\`\`\`
 
 ### 4. 克隆并安装项目
 
-```bash
+\`\`\`bash
 # 克隆项目
 git clone https://github.com/jsntcheng/xxx_party_game.git
 cd xxx-party-game
 
 # 安装依赖
 pnpm install
-```
+\`\`\`
 
 ### 5. 配置环境变量
 
-```bash
+\`\`\`bash
 # 复制环境变量模板
 cp .env.example .env.local
 
 # 编辑配置文件
 # Windows: notepad .env.local
 # macOS/Linux: nano .env.local
-```
+\`\`\`
 
 根据需要配置以下变量（参见 [配置说明](#配置说明)）：
 - `DATABASE_URL` - 数据库连接(可选)
@@ -148,32 +148,32 @@ cp .env.example .env.local
 ### 6. 启动项目
 
 **开发模式：**
-```bash
+\`\`\`bash
 pnpm dev
-```
+\`\`\`
 访问 http://localhost:3000
 
 **生产模式：**
-```bash
+\`\`\`bash
 # 构建项目
 pnpm build
 
 # 启动服务
 pnpm start
-```
+\`\`\`
 
 **指定端口启动：**
-```bash
+\`\`\`bash
 # 开发模式指定端口
 pnpm dev -p 8080
 
 # 生产模式指定端口
 PORT=8080 pnpm start
-```
+\`\`\`
 
 ### 7. 使用 PM2 后台运行（可选）
 
-```bash
+\`\`\`bash
 # 安装 PM2
 pnpm add -g pm2
 
@@ -192,7 +192,7 @@ pm2 logs couple-game
 # 开机自启
 pm2 startup
 pm2 save
-```
+\`\`\`
 
 ---
 
@@ -202,7 +202,7 @@ pm2 save
 
 在项目根目录创建 `.env.local` 文件：
 
-```env
+\`\`\`env
 # 数据库配置（可选，不配置则使用本地 JSON 文件存储）
 DATABASE_URL=mysql://用户名:密码@主机:端口/数据库名
 
@@ -211,7 +211,7 @@ ADMIN_PASSWORD=your_admin_password
 
 # 房间过期时限（小时，默认 24）
 ROOM_EXPIRY_HOURS=24
-```
+\`\`\`
 
 ### 存储方式
 
@@ -263,17 +263,17 @@ ROOM_EXPIRY_HOURS=24
 ## 常见问题
 
 ### Q: 启动时报错 "Module not found"
-```bash
+\`\`\`bash
 # 删除依赖重新安装
 rm -rf node_modules pnpm-lock.yaml
 pnpm install
-```
+\`\`\`
 
 ### Q: 端口被占用
-```bash
+\`\`\`bash
 # 使用其他端口
 pnpm dev -p 3001
-```
+\`\`\`
 
 ### Q: 国内安装依赖很慢
 确保已设置镜像源，参考 [设置镜像源](#3-设置镜像源国内用户推荐)

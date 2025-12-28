@@ -1,12 +1,17 @@
 "use client"
-
-import type { GameConfig, CellType, GameCell } from "@/lib/game-data"
-import { specialCellConfigs } from "@/lib/game-data"
 import { useState, useEffect } from "react"
+import { X, Plus, Trash2, Download, Upload, ChevronDown, ChevronUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { X, Plus, Trash2, Save, RotateCcw, Download, Upload, Copy, ClipboardPaste, Lock } from "lucide-react"
+import {
+  type GameConfig,
+  type GameCell,
+  type SceneCard,
+  defaultSceneCardPoolNames,
+  defaultSceneCards,
+} from "@/lib/game-data"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface ConfigModalProps {
   isOpen: boolean
@@ -22,33 +27,63 @@ export function ConfigModal({ isOpen, onClose, config, onSave, onReset }: Config
   const [newCellContent, setNewCellContent] = useState("")
   const [newCellGender, setNewCellGender] = useState<"both" | "male" | "female">("both")
   const [newPosition, setNewPosition] = useState("")
-  const [newPositionType, setNewPositionType] = useState<CellType>("truth")
-  const [showImportExport, setShowImportExport] = useState(false)
-  const [importExportText, setImportExportText] = useState("")
-  const [importExportMode, setImportExportMode] = useState<"import" | "export">("export")
+  const [newPositionType, setNewPositionType] = useState<string>("truth")
+  const [newSceneTitle, setNewSceneTitle] = useState("")
+  const [newSceneDesc, setNewSceneDesc] = useState("")
+  const [newSceneIcon, setNewSceneIcon] = useState("")
+  const [newScenePool, setNewScenePool] = useState("")
+  const [newPoolName, setNewPoolName] = useState("")
+  const [expandedPools, setExpandedPools] = useState<{ [key: string]: boolean }>({})
+
+  const [showExportDialog, setShowExportDialog] = useState(false)
+  const [showImportDialog, setShowImportDialog] = useState(false)
+  const [importText, setImportText] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [importTarget, setImportTarget] = useState<"current" | "default">("current")
   const [adminPassword, setAdminPassword] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
-    setLocalConfig(config)
+    if (config) {
+      let configWithNewFormat = { ...config }
+      if (!config.sceneCardPoolNames || !config.sceneCards) {
+        // 旧格式转换
+        if (config.sceneCardPools && config.sceneCardPools.length > 0) {
+          const poolNames = config.sceneCardPools.map((_, i) => `卡池${i + 1}`)
+          const cards: SceneCard[] = []
+          config.sceneCardPools.forEach((pool, i) => {
+            pool.forEach((card) => {
+              cards.push({ ...card, pool: poolNames[i] })
+            })
+          })
+          configWithNewFormat = {
+            ...config,
+            sceneCardPoolNames: poolNames,
+            sceneCards: cards,
+            sceneCardCount: config.sceneCardCount ?? config.sceneCardPools.length,
+          }
+        } else {
+          configWithNewFormat = {
+            ...config,
+            sceneCardPoolNames: defaultSceneCardPoolNames,
+            sceneCards: defaultSceneCards,
+            sceneCardCount: config.sceneCardCount ?? 3,
+          }
+        }
+      }
+      setLocalConfig(configWithNewFormat)
+      // 初始化展开状态
+      if (configWithNewFormat.sceneCardPoolNames) {
+        const expanded: { [key: string]: boolean } = {}
+        configWithNewFormat.sceneCardPoolNames.forEach((name, i) => {
+          expanded[name] = i === 0
+        })
+        setExpandedPools(expanded)
+        if (configWithNewFormat.sceneCardPoolNames.length > 0) {
+          setNewScenePool(configWithNewFormat.sceneCardPoolNames[0])
+        }
+      }
+    }
   }, [config])
-
-  if (!isOpen) return null
-
-  const cellTypeToTab: { [key: string]: CellType[] } = {
-    normal: ["normal"],
-    male: ["normal"],
-    female: ["normal"],
-    truth: ["truth"],
-    dare: ["dare"],
-    kiss: ["kiss"],
-    hug: ["hug"],
-    punishment: ["punishment"],
-    reward: ["reward"],
-    endpoint: ["endpoint-zone"],
-    positions: [],
-  }
 
   const tabToConfigKey: { [key: string]: keyof GameConfig } = {
     normal: "normalCells",
@@ -65,63 +100,42 @@ export function ConfigModal({ isOpen, onClose, config, onSave, onReset }: Config
 
   const handleAddCell = () => {
     if (!newCellContent.trim()) return
-
-    const configKey = tabToConfigKey[activeTab]
-    if (!configKey) return
-
-    const cells = localConfig[configKey] as GameCell[]
-    const newId = Math.max(...cells.map((c) => c.id), 0) + 1
-
-    let cellType: CellType = "normal"
-    if (activeTab === "truth") cellType = "truth"
-    else if (activeTab === "dare") cellType = "dare"
-    else if (activeTab === "kiss") cellType = "kiss"
-    else if (activeTab === "hug") cellType = "hug"
-    else if (activeTab === "punishment") cellType = "punishment"
-    else if (activeTab === "reward") cellType = "reward"
-    else if (activeTab === "endpoint") cellType = "endpoint-zone"
-
+    const key = tabToConfigKey[activeTab]
+    if (!key) return
+    const currentCells = (localConfig[key] as GameCell[]) || []
+    const cellType = activeTab
+    const gender = activeTab === "male" ? "male" : activeTab === "female" ? "female" : newCellGender
     const newCell: GameCell = {
-      id: newId,
-      content: newCellContent,
-      type: cellType,
-      player: activeTab === "male" ? "male" : activeTab === "female" ? "female" : newCellGender,
+      id: Date.now(),
+      content: newCellContent.trim(),
+      type: cellType as GameCell["type"],
+      player: gender,
     }
-
     setLocalConfig({
       ...localConfig,
-      [configKey]: [...cells, newCell],
+      [key]: [...currentCells, newCell],
     })
     setNewCellContent("")
     setNewCellGender("both")
   }
 
   const handleDeleteCell = (id: number) => {
-    const configKey = tabToConfigKey[activeTab]
-    if (!configKey) return
-
-    const cells = localConfig[configKey] as GameCell[]
+    const key = tabToConfigKey[activeTab]
+    if (!key) return
     setLocalConfig({
       ...localConfig,
-      [configKey]: cells.filter((c) => c.id !== id),
+      [key]: ((localConfig[key] as GameCell[]) || []).filter((cell) => cell.id !== id),
     })
   }
 
   const handleAddPosition = () => {
     const pos = Number.parseInt(newPosition)
-    if (isNaN(pos) || pos < 1 || pos > localConfig.boardSize) {
-      alert(`请输入1到${localConfig.boardSize}之间的位置编号`)
-      return
-    }
-    if (localConfig.specialCellPositions[pos]) {
-      alert(`位置 ${pos} 已经设置了特殊格子`)
-      return
-    }
+    if (isNaN(pos) || pos < 1 || pos > localConfig.boardSize) return
     setLocalConfig({
       ...localConfig,
       specialCellPositions: {
         ...localConfig.specialCellPositions,
-        [pos]: newPositionType,
+        [pos]: newPositionType as GameCell["type"],
       },
     })
     setNewPosition("")
@@ -141,405 +155,614 @@ export function ConfigModal({ isOpen, onClose, config, onSave, onReset }: Config
     onClose()
   }
 
-  const handleExportConfig = () => {
-    const configJson = JSON.stringify(localConfig, null, 2)
-    setImportExportText(configJson)
-    setImportExportMode("export")
-    setShowImportExport(true)
-  }
-
-  const handleImportConfig = () => {
-    setImportExportText("")
-    setImportExportMode("import")
-    setImportTarget("current")
-    setAdminPassword("")
-    setShowImportExport(true)
-  }
-
-  const handleCopyToClipboard = async () => {
-    try {
-      await navigator.clipboard.writeText(importExportText)
-      alert("配置已复制到剪贴板！")
-    } catch (err) {
-      const textArea = document.createElement("textarea")
-      textArea.value = importExportText
-      textArea.style.position = "fixed"
-      textArea.style.left = "-9999px"
-      document.body.appendChild(textArea)
-      textArea.select()
-      document.execCommand("copy")
-      document.body.removeChild(textArea)
-      alert("配置已复制到剪贴板！")
+  const handleAddPool = () => {
+    if (!newPoolName.trim()) return
+    const poolNames = [...(localConfig.sceneCardPoolNames || [])]
+    if (poolNames.includes(newPoolName.trim())) {
+      alert("卡池名称已存在")
+      return
     }
+    poolNames.push(newPoolName.trim())
+    setLocalConfig({ ...localConfig, sceneCardPoolNames: poolNames })
+    setExpandedPools({ ...expandedPools, [newPoolName.trim()]: true })
+    setNewPoolName("")
   }
 
-  const handlePasteAndImport = async () => {
+  const handleDeletePool = (poolName: string) => {
+    const poolNames = (localConfig.sceneCardPoolNames || []).filter((n) => n !== poolName)
+    const cards = (localConfig.sceneCards || []).filter((c) => c.pool !== poolName)
+    const newCount = Math.min(localConfig.sceneCardCount || 3, poolNames.length)
+    setLocalConfig({ ...localConfig, sceneCardPoolNames: poolNames, sceneCards: cards, sceneCardCount: newCount })
+  }
+
+  const handleAddSceneCard = () => {
+    if (!newSceneTitle.trim() || !newSceneDesc.trim() || !newScenePool) return
+    const newCard: SceneCard = {
+      id: Date.now(),
+      title: newSceneTitle.trim(),
+      description: newSceneDesc.trim(),
+      icon: newSceneIcon.trim() || "🎴",
+      pool: newScenePool,
+    }
+    setLocalConfig({
+      ...localConfig,
+      sceneCards: [...(localConfig.sceneCards || []), newCard],
+    })
+    setNewSceneTitle("")
+    setNewSceneDesc("")
+    setNewSceneIcon("")
+  }
+
+  const handleDeleteSceneCard = (cardId: number) => {
+    setLocalConfig({
+      ...localConfig,
+      sceneCards: (localConfig.sceneCards || []).filter((c) => c.id !== cardId),
+    })
+  }
+
+  const togglePoolExpanded = (poolName: string) => {
+    setExpandedPools({ ...expandedPools, [poolName]: !expandedPools[poolName] })
+  }
+
+  const getCardsInPool = (poolName: string) => {
+    return (localConfig.sceneCards || []).filter((c) => c.pool === poolName)
+  }
+
+  const handleImport = async () => {
     try {
-      const importedConfig = JSON.parse(importExportText) as GameConfig
-      if (!importedConfig.normalCells || !importedConfig.boardSize || !importedConfig.specialCellPositions) {
-        alert("配置格式无效，请检查JSON内容")
+      const parsed = JSON.parse(importText)
+      if (!parsed.normalCells || !parsed.boardSize) {
+        alert("配置格式不正确")
         return
       }
-
-      if (importTarget === "current") {
-        // 导入到当前房间
-        setLocalConfig(importedConfig)
-        setShowImportExport(false)
-        setImportExportText("")
-        alert("配置已导入到当前房间！")
-      } else {
-        // 导入到默认配置，需要密码验证
-        if (!adminPassword.trim()) {
-          alert("请输入管理员密码")
-          return
+      // 兼容处理
+      let configWithNewFormat = { ...parsed }
+      if (!parsed.sceneCardPoolNames || !parsed.sceneCards) {
+        if (parsed.sceneCardPools && parsed.sceneCardPools.length > 0) {
+          const poolNames = parsed.sceneCardPools.map((_: SceneCard[], i: number) => `卡池${i + 1}`)
+          const cards: SceneCard[] = []
+          parsed.sceneCardPools.forEach((pool: SceneCard[], i: number) => {
+            pool.forEach((card: SceneCard) => {
+              cards.push({ ...card, pool: poolNames[i] })
+            })
+          })
+          configWithNewFormat = {
+            ...parsed,
+            sceneCardPoolNames: poolNames,
+            sceneCards: cards,
+            sceneCardCount: parsed.sceneCardCount ?? parsed.sceneCardPools.length,
+          }
+        } else {
+          configWithNewFormat = {
+            ...parsed,
+            sceneCardPoolNames: defaultSceneCardPoolNames,
+            sceneCards: defaultSceneCards,
+            sceneCardCount: parsed.sceneCardCount ?? 3,
+          }
         }
-
+      }
+      if (importTarget === "default") {
         setIsSubmitting(true)
         try {
-          const response = await fetch("/api/default-config", {
+          const res = await fetch("/api/default-config", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ password: adminPassword, config: importedConfig }),
+            body: JSON.stringify({ config: configWithNewFormat, password: adminPassword }),
           })
-          const result = await response.json()
-
-          if (result.success) {
-            setShowImportExport(false)
-            setImportExportText("")
-            setAdminPassword("")
-            alert("配置已保存为默认配置！新创建的房间将使用此配置。")
-          } else {
-            alert(result.error || "保存失败")
+          const data = await res.json()
+          if (!res.ok) {
+            alert(data.error || "保存失败")
+            return
           }
-        } catch (error) {
-          alert("网络错误，请重试")
+          alert("默认配置已更新")
         } finally {
           setIsSubmitting(false)
         }
+      } else {
+        setLocalConfig(configWithNewFormat)
+        onSave(configWithNewFormat)
       }
+      setShowImportDialog(false)
+      setImportText("")
+      setAdminPassword("")
     } catch {
-      alert("配置格式无效，请确保粘贴的是正确的JSON格式")
+      alert("JSON格式错误")
     }
   }
 
-  const renderCellList = () => {
-    const configKey = tabToConfigKey[activeTab]
-    if (!configKey) return null
-
-    const cells = localConfig[configKey] as GameCell[]
-
+  const renderSceneCardsTab = () => {
+    const poolNames = localConfig.sceneCardPoolNames || []
     return (
-      <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-2">
-        {cells.map((cell) => (
-          <div key={cell.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-            <span className="flex-1 text-sm">{cell.content}</span>
-            {(activeTab === "normal" || activeTab === "truth" || activeTab === "dare") && (
-              <span
-                className={`text-xs px-1.5 py-0.5 rounded ${
-                  cell.player === "male"
-                    ? "bg-blue-100 text-blue-600"
-                    : cell.player === "female"
-                      ? "bg-pink-100 text-pink-600"
-                      : "bg-gray-100 text-gray-600"
-                }`}
-              >
-                {cell.player === "male" ? "男" : cell.player === "female" ? "女" : "通用"}
-              </span>
-            )}
-            <button onClick={() => handleDeleteCell(cell.id)} className="text-red-400 hover:text-red-600 p-1">
-              <Trash2 className="w-4 h-4" />
-            </button>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1">
+            <label className="text-sm text-muted-foreground block mb-1">抽取场景卡数量</label>
+            <p className="text-xs text-gray-400">依次从前N个卡池各抽1张</p>
           </div>
-        ))}
-      </div>
-    )
-  }
+          <Input
+            type="number"
+            value={localConfig.sceneCardCount ?? 3}
+            onChange={(e) => {
+              const count = Math.max(0, Math.min(Number.parseInt(e.target.value) || 0, poolNames.length))
+              setLocalConfig({ ...localConfig, sceneCardCount: count })
+            }}
+            min={0}
+            max={poolNames.length}
+            className="w-20 h-8"
+          />
+        </div>
 
-  const renderPositionList = () => {
-    const positions = Object.entries(localConfig.specialCellPositions)
-      .map(([pos, type]) => ({ position: Number.parseInt(pos), type }))
-      .sort((a, b) => a.position - b.position)
+        {/* 卡池列表 */}
+        <div className="space-y-2 max-h-64 md:max-h-72 overflow-y-auto">
+          {poolNames.map((poolName, index) => {
+            const cardsInPool = getCardsInPool(poolName)
+            const isExpanded = expandedPools[poolName]
+            return (
+              <div key={poolName} className="border rounded-lg overflow-hidden">
+                <div
+                  className="flex items-center justify-between p-2 bg-gradient-to-r from-amber-50 to-orange-50 cursor-pointer"
+                  onClick={() => togglePoolExpanded(poolName)}
+                >
+                  <div className="flex items-center gap-2">
+                    {isExpanded ? (
+                      <ChevronUp className="w-4 h-4 text-gray-500" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-gray-500" />
+                    )}
+                    <span className="font-medium text-sm text-amber-700">
+                      {index < (localConfig.sceneCardCount || 0) && (
+                        <span className="text-xs bg-amber-500 text-white px-1 rounded mr-1">第{index + 1}张</span>
+                      )}
+                      {poolName}
+                    </span>
+                    <span className="text-xs text-gray-500">({cardsInPool.length}张)</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDeletePool(poolName)
+                    }}
+                  >
+                    <Trash2 className="w-3 h-3 text-red-500" />
+                  </Button>
+                </div>
+                {isExpanded && (
+                  <div className="p-2 space-y-2 bg-white">
+                    {cardsInPool.map((card) => (
+                      <div key={card.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded text-sm">
+                        <span className="text-lg">{card.icon || "🎴"}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate text-xs">{card.title}</div>
+                          <div className="text-xs text-gray-500 truncate">{card.description}</div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 shrink-0"
+                          onClick={() => handleDeleteSceneCard(card.id)}
+                        >
+                          <Trash2 className="w-3 h-3 text-red-500" />
+                        </Button>
+                      </div>
+                    ))}
+                    {cardsInPool.length === 0 && <p className="text-center text-gray-400 py-2 text-xs">此卡池为空</p>}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
 
-    return (
-      <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-2">
-        {positions.map(({ position, type }) => {
-          const config = specialCellConfigs.find((c) => c.type === type)
-          return (
-            <div key={position} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-              <span className="w-12 text-center font-mono text-sm bg-white rounded px-2 py-1">{position}</span>
-              <span className={`flex-1 text-sm px-2 py-1 rounded ${config?.color || "bg-gray-200"} text-white`}>
-                {config?.name || type}
-              </span>
-              <button onClick={() => handleDeletePosition(position)} className="text-red-400 hover:text-red-600 p-1">
-                <Trash2 className="w-4 h-4" />
-              </button>
+        {/* 添加新卡池 */}
+        <div className="flex gap-2">
+          <Input
+            value={newPoolName}
+            onChange={(e) => setNewPoolName(e.target.value)}
+            placeholder="新卡池名称..."
+            className="flex-1 h-8 text-sm"
+            onKeyDown={(e) => e.key === "Enter" && handleAddPool()}
+          />
+          <Button
+            onClick={handleAddPool}
+            size="sm"
+            className="bg-amber-500 hover:bg-amber-600 text-white h-8"
+            disabled={!newPoolName.trim()}
+          >
+            <Plus className="w-3 h-3 mr-1" />
+            添加卡池
+          </Button>
+        </div>
+
+        {/* 添加新场景卡 */}
+        {poolNames.length > 0 && (
+          <div className="border-t pt-3 space-y-2">
+            <label className="text-sm font-medium">添加场景卡</label>
+            <div className="flex gap-2 flex-wrap">
+              <Input
+                value={newSceneIcon}
+                onChange={(e) => setNewSceneIcon(e.target.value)}
+                placeholder="图标"
+                className="w-14 h-8 text-sm"
+              />
+              <Input
+                value={newSceneTitle}
+                onChange={(e) => setNewSceneTitle(e.target.value)}
+                placeholder="名称"
+                className="flex-1 min-w-24 h-8 text-sm"
+              />
+              <Select value={newScenePool} onValueChange={setNewScenePool}>
+                <SelectTrigger className="w-28 h-8 text-sm">
+                  <SelectValue placeholder="选择卡池" />
+                </SelectTrigger>
+                <SelectContent>
+                  {poolNames.map((name) => (
+                    <SelectItem key={name} value={name}>
+                      {name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          )
-        })}
+            <div className="flex gap-2">
+              <Input
+                value={newSceneDesc}
+                onChange={(e) => setNewSceneDesc(e.target.value)}
+                placeholder="描述..."
+                className="flex-1 h-8 text-sm"
+                onKeyDown={(e) => e.key === "Enter" && handleAddSceneCard()}
+              />
+              <Button
+                onClick={handleAddSceneCard}
+                size="sm"
+                className="bg-amber-500 hover:bg-amber-600 text-white h-8"
+                disabled={!newSceneTitle.trim() || !newSceneDesc.trim() || !newScenePool}
+              >
+                <Plus className="w-3 h-3" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
+
+  const renderCellsList = () => {
+    const key = tabToConfigKey[activeTab]
+    if (!key) return null
+    const cells = (localConfig[key] as GameCell[]) || []
+    return (
+      <div className="space-y-4">
+        <div className="max-h-48 md:max-h-64 overflow-y-auto space-y-2">
+          {cells.map((cell) => (
+            <div key={cell.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
+              <span className="flex-1 text-sm">{cell.content}</span>
+              {cell.player && cell.player !== "both" && (
+                <span
+                  className={`text-xs px-1 rounded ${cell.player === "male" ? "bg-blue-100 text-blue-600" : "bg-pink-100 text-pink-600"}`}
+                >
+                  {cell.player === "male" ? "♂" : "♀"}
+                </span>
+              )}
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDeleteCell(cell.id)}>
+                <Trash2 className="w-3 h-3 text-red-500" />
+              </Button>
+            </div>
+          ))}
+          {cells.length === 0 && <p className="text-center text-gray-400 py-4">暂无内容</p>}
+        </div>
+        <div className="flex gap-2">
+          <Input
+            value={newCellContent}
+            onChange={(e) => setNewCellContent(e.target.value)}
+            placeholder="输入新内容..."
+            className="flex-1"
+            onKeyDown={(e) => e.key === "Enter" && handleAddCell()}
+          />
+          {activeTab === "normal" && (
+            <Select value={newCellGender} onValueChange={(v) => setNewCellGender(v as "both" | "male" | "female")}>
+              <SelectTrigger className="w-20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="both">通用</SelectItem>
+                <SelectItem value="male">♂</SelectItem>
+                <SelectItem value="female">♀</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+          <Button onClick={handleAddCell} className="bg-rose-500 hover:bg-rose-600 text-white">
+            <Plus className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  const renderPositionsTab = () => {
+    const positions = Object.entries(localConfig.specialCellPositions || {}).sort(([a], [b]) => Number(a) - Number(b))
+    const cellTypes = [
+      { value: "truth", label: "真心话" },
+      { value: "dare", label: "大冒险" },
+      { value: "kiss", label: "亲亲" },
+      { value: "hug", label: "抱抱" },
+      { value: "punishment", label: "惩罚" },
+      { value: "reward", label: "奖励" },
+      { value: "forward", label: "前进" },
+      { value: "backward", label: "后退" },
+      { value: "skip", label: "停一轮" },
+      { value: "again", label: "再掷一次" },
+      { value: "swap", label: "交换" },
+    ]
+    return (
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <label className="text-sm text-muted-foreground">棋盘大小</label>
+          <Input
+            type="number"
+            value={localConfig.boardSize}
+            onChange={(e) =>
+              setLocalConfig({ ...localConfig, boardSize: Math.max(10, Number.parseInt(e.target.value) || 48) })
+            }
+            min={10}
+          />
+          <p className="text-xs text-muted-foreground">棋盘会根据格子数量自动调整行列数，建议范围：20-100格</p>
+          <p className="text-xs text-amber-600">修改后需要点击"重新开始"按钮才能生效</p>
+        </div>
+        <div className="max-h-48 md:max-h-64 overflow-y-auto space-y-2">
+          {positions.map(([pos, type]) => (
+            <div key={pos} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
+              <span className="w-12 text-sm font-medium">第{pos}格</span>
+              <span className="flex-1 text-sm">{cellTypes.find((t) => t.value === type)?.label || type}</span>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDeletePosition(Number(pos))}>
+                <Trash2 className="w-3 h-3 text-red-500" />
+              </Button>
+            </div>
+          ))}
+          {positions.length === 0 && <p className="text-center text-gray-400 py-4">暂无特殊位置设定</p>}
+        </div>
+        <div className="flex gap-2">
+          <Input
+            type="number"
+            value={newPosition}
+            onChange={(e) => setNewPosition(e.target.value)}
+            placeholder="位置"
+            className="w-20"
+            min={1}
+            max={localConfig.boardSize}
+          />
+          <Select value={newPositionType} onValueChange={setNewPositionType}>
+            <SelectTrigger className="flex-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {cellTypes.map((t) => (
+                <SelectItem key={t.value} value={t.value}>
+                  {t.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button onClick={handleAddPosition} className="bg-rose-500 hover:bg-rose-600 text-white">
+            <Plus className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-bold">游戏配置</h2>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleExportConfig} className="bg-transparent text-xs">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 md:p-4">
+      <div className="w-full max-w-2xl max-h-[90vh] bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between p-3 md:p-4 border-b">
+          <h2 className="text-base md:text-lg font-bold">游戏配置</h2>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowExportDialog(true)}
+              className="text-xs bg-transparent"
+            >
               <Download className="w-3 h-3 mr-1" />
               导出
             </Button>
-            <Button variant="outline" size="sm" onClick={handleImportConfig} className="bg-transparent text-xs">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowImportDialog(true)}
+              className="text-xs bg-transparent"
+            >
               <Upload className="w-3 h-3 mr-1" />
               导入
             </Button>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <Button variant="ghost" size="icon" onClick={onClose}>
               <X className="w-5 h-5" />
-            </button>
+            </Button>
           </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto p-3 md:p-4">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="flex flex-wrap gap-1 h-auto mb-4 bg-transparent">
-              <TabsTrigger value="normal" className="text-xs data-[state=active]:bg-rose-100">
+              <TabsTrigger value="normal" className="text-xs md:text-sm data-[state=active]:bg-rose-100">
                 普通
               </TabsTrigger>
-              <TabsTrigger value="male" className="text-xs data-[state=active]:bg-blue-100">
+              <TabsTrigger value="male" className="text-xs md:text-sm data-[state=active]:bg-blue-100">
                 男生专属
               </TabsTrigger>
-              <TabsTrigger value="female" className="text-xs data-[state=active]:bg-pink-100">
+              <TabsTrigger value="female" className="text-xs md:text-sm data-[state=active]:bg-pink-100">
                 女生专属
               </TabsTrigger>
-              <TabsTrigger value="truth" className="text-xs data-[state=active]:bg-blue-100">
+              <TabsTrigger value="truth" className="text-xs md:text-sm data-[state=active]:bg-blue-100">
                 真心话
               </TabsTrigger>
-              <TabsTrigger value="dare" className="text-xs data-[state=active]:bg-purple-100">
+              <TabsTrigger value="dare" className="text-xs md:text-sm data-[state=active]:bg-purple-100">
                 大冒险
               </TabsTrigger>
-              <TabsTrigger value="kiss" className="text-xs data-[state=active]:bg-pink-100">
+              <TabsTrigger value="kiss" className="text-xs md:text-sm data-[state=active]:bg-pink-100">
                 亲亲
               </TabsTrigger>
-              <TabsTrigger value="hug" className="text-xs data-[state=active]:bg-rose-100">
+              <TabsTrigger value="hug" className="text-xs md:text-sm data-[state=active]:bg-rose-100">
                 抱抱
               </TabsTrigger>
-              <TabsTrigger value="punishment" className="text-xs data-[state=active]:bg-orange-100">
+              <TabsTrigger value="punishment" className="text-xs md:text-sm data-[state=active]:bg-orange-100">
                 惩罚
               </TabsTrigger>
-              <TabsTrigger value="reward" className="text-xs data-[state=active]:bg-emerald-100">
+              <TabsTrigger value="reward" className="text-xs md:text-sm data-[state=active]:bg-emerald-100">
                 奖励
               </TabsTrigger>
-              <TabsTrigger value="endpoint" className="text-xs data-[state=active]:bg-yellow-100">
+              <TabsTrigger value="endpoint" className="text-xs md:text-sm data-[state=active]:bg-yellow-100">
                 终点区
               </TabsTrigger>
-              <TabsTrigger value="positions" className="text-xs data-[state=active]:bg-indigo-100">
+              <TabsTrigger value="positions" className="text-xs md:text-sm data-[state=active]:bg-indigo-100">
                 位置设定
+              </TabsTrigger>
+              <TabsTrigger value="scenes" className="text-xs md:text-sm data-[state=active]:bg-amber-100">
+                场景卡
               </TabsTrigger>
             </TabsList>
 
-            {/* Cell list tabs */}
-            {Object.keys(tabToConfigKey).map((tab) => (
-              <TabsContent key={tab} value={tab} className="space-y-4">
-                {renderCellList()}
-                <div className="flex gap-2 mt-4">
-                  <Input
-                    value={newCellContent}
-                    onChange={(e) => setNewCellContent(e.target.value)}
-                    placeholder="输入新内容..."
-                    className="flex-1"
-                    onKeyDown={(e) => e.key === "Enter" && handleAddCell()}
-                  />
-                  {(tab === "normal" || tab === "truth" || tab === "dare") && tab !== "male" && tab !== "female" && (
-                    <select
-                      value={newCellGender}
-                      onChange={(e) => setNewCellGender(e.target.value as "both" | "male" | "female")}
-                      className="px-2 py-1 border rounded text-sm"
-                    >
-                      <option value="both">通用</option>
-                      <option value="male">男生</option>
-                      <option value="female">女生</option>
-                    </select>
-                  )}
-                  <Button onClick={handleAddCell} size="sm" className="bg-rose-500 hover:bg-rose-600 text-white">
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                </div>
-              </TabsContent>
-            ))}
-
-            {/* Positions tab */}
-            <TabsContent value="positions" className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm text-muted-foreground">棋盘大小</label>
-                <Input
-                  type="number"
-                  value={localConfig.boardSize}
-                  onChange={(e) => setLocalConfig({ ...localConfig, boardSize: Number.parseInt(e.target.value) || 48 })}
-                  min={20}
-                  max={100}
-                />
-              </div>
-              {renderPositionList()}
-              <div className="flex gap-2 mt-4 flex-wrap">
-                <Input
-                  type="number"
-                  value={newPosition}
-                  onChange={(e) => setNewPosition(e.target.value)}
-                  placeholder="位置编号"
-                  className="w-24"
-                  min={1}
-                  max={localConfig.boardSize}
-                />
-                <select
-                  value={newPositionType}
-                  onChange={(e) => setNewPositionType(e.target.value as CellType)}
-                  className="flex-1 min-w-[120px] px-2 py-1 border rounded text-sm"
-                >
-                  {specialCellConfigs.map((config) => (
-                    <option key={config.type} value={config.type}>
-                      {config.name}
-                    </option>
-                  ))}
-                </select>
-                <Button onClick={handleAddPosition} size="sm" className="bg-rose-500 hover:bg-rose-600 text-white">
-                  <Plus className="w-4 h-4 mr-1" />
-                  添加
-                </Button>
-              </div>
-            </TabsContent>
+            <TabsContent value="normal">{renderCellsList()}</TabsContent>
+            <TabsContent value="male">{renderCellsList()}</TabsContent>
+            <TabsContent value="female">{renderCellsList()}</TabsContent>
+            <TabsContent value="truth">{renderCellsList()}</TabsContent>
+            <TabsContent value="dare">{renderCellsList()}</TabsContent>
+            <TabsContent value="kiss">{renderCellsList()}</TabsContent>
+            <TabsContent value="hug">{renderCellsList()}</TabsContent>
+            <TabsContent value="punishment">{renderCellsList()}</TabsContent>
+            <TabsContent value="reward">{renderCellsList()}</TabsContent>
+            <TabsContent value="endpoint">{renderCellsList()}</TabsContent>
+            <TabsContent value="positions">{renderPositionsTab()}</TabsContent>
+            <TabsContent value="scenes">{renderSceneCardsTab()}</TabsContent>
           </Tabs>
         </div>
 
-        {/* Footer */}
-        <div className="flex justify-between gap-2 p-4 border-t">
+        <div className="p-3 md:p-4 border-t flex gap-2 justify-end">
           <Button variant="outline" onClick={onReset} className="bg-transparent">
-            <RotateCcw className="w-4 h-4 mr-1" />
-            重置默认
+            恢复默认
           </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose} className="bg-transparent">
-              取消
-            </Button>
-            <Button onClick={handleSave} className="bg-rose-500 hover:bg-rose-600 text-white">
-              <Save className="w-4 h-4 mr-1" />
-              保存
-            </Button>
-          </div>
+          <Button variant="outline" onClick={onClose} className="bg-transparent">
+            取消
+          </Button>
+          <Button onClick={handleSave} className="bg-rose-500 hover:bg-rose-600 text-white">
+            保存
+          </Button>
         </div>
       </div>
 
-      {showImportExport && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] p-4">
-          <div className="bg-white rounded-xl w-full max-w-lg p-4 shadow-2xl">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-bold text-lg">{importExportMode === "export" ? "导出配置" : "导入配置"}</h3>
-              <button onClick={() => setShowImportExport(false)} className="text-gray-400 hover:text-gray-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {importExportMode === "export" ? (
-              <>
-                <p className="text-sm text-muted-foreground mb-2">点击下方按钮复制配置，然后保存到文本文件中</p>
-                <textarea
-                  value={importExportText}
-                  readOnly
-                  className="w-full h-48 p-3 border rounded-lg text-xs font-mono bg-gray-50 resize-none"
-                />
-                <div className="flex justify-end gap-2 mt-3">
-                  <Button variant="outline" onClick={() => setShowImportExport(false)} className="bg-transparent">
-                    关闭
-                  </Button>
-                  <Button onClick={handleCopyToClipboard} className="bg-rose-500 hover:bg-rose-600 text-white">
-                    <Copy className="w-4 h-4 mr-1" />
-                    复制到剪贴板
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-muted-foreground mb-2">将之前导出的配置JSON粘贴到下方</p>
-                <textarea
-                  value={importExportText}
-                  onChange={(e) => setImportExportText(e.target.value)}
-                  placeholder='粘贴配置JSON内容，例如: {"boardSize": 48, ...}'
-                  className="w-full h-36 p-3 border rounded-lg text-xs font-mono resize-none"
-                />
-
-                <div className="mt-3 space-y-2">
-                  <label className="text-sm font-medium">导入到：</label>
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="importTarget"
-                        value="current"
-                        checked={importTarget === "current"}
-                        onChange={() => setImportTarget("current")}
-                        className="text-rose-500"
-                      />
-                      <span className="text-sm">当前房间</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="importTarget"
-                        value="default"
-                        checked={importTarget === "default"}
-                        onChange={() => setImportTarget("default")}
-                        className="text-rose-500"
-                      />
-                      <span className="text-sm flex items-center gap-1">
-                        <Lock className="w-3 h-3" />
-                        默认配置
-                      </span>
-                    </label>
-                  </div>
-                </div>
-
-                {importTarget === "default" && (
-                  <div className="mt-3">
-                    <label className="text-sm font-medium mb-1 block">管理员密码：</label>
-                    <Input
-                      type="password"
-                      value={adminPassword}
-                      onChange={(e) => setAdminPassword(e.target.value)}
-                      placeholder="请输入管理员密码"
-                      className="w-full"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">保存为默认配置后，新创建的房间将使用此配置</p>
-                  </div>
-                )}
-
-                <div className="flex justify-end gap-2 mt-4">
-                  <Button variant="outline" onClick={() => setShowImportExport(false)} className="bg-transparent">
-                    取消
-                  </Button>
-                  <Button
-                    onClick={handlePasteAndImport}
-                    disabled={
-                      !importExportText.trim() || isSubmitting || (importTarget === "default" && !adminPassword.trim())
+      {/* 导出对话框 */}
+      {showExportDialog && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-4">
+            <h3 className="font-bold mb-3">导出配置</h3>
+            <textarea
+              id="export-config-text"
+              value={JSON.stringify(localConfig, null, 2)}
+              className="w-full h-48 p-2 border rounded text-xs font-mono"
+              readOnly
+            />
+            <div className="flex gap-2 mt-3 justify-end">
+              <Button variant="outline" onClick={() => setShowExportDialog(false)} className="bg-transparent">
+                关闭
+              </Button>
+              <Button
+                onClick={() => {
+                  const text = JSON.stringify(localConfig, null, 2)
+                  if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard
+                      .writeText(text)
+                      .then(() => {
+                        alert("已复制到剪贴板")
+                      })
+                      .catch(() => {
+                        // fallback
+                        const textarea = document.getElementById("export-config-text") as HTMLTextAreaElement
+                        if (textarea) {
+                          textarea.select()
+                          document.execCommand("copy")
+                          alert("已复制到剪贴板")
+                        }
+                      })
+                  } else {
+                    // fallback for environments without clipboard API
+                    const textarea = document.getElementById("export-config-text") as HTMLTextAreaElement
+                    if (textarea) {
+                      textarea.select()
+                      document.execCommand("copy")
+                      alert("已复制到剪贴板")
+                    } else {
+                      alert("请手动选择并复制上方文本")
                     }
-                    className="bg-rose-500 hover:bg-rose-600 text-white"
-                  >
-                    {isSubmitting ? (
-                      <span className="flex items-center gap-1">
-                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        保存中...
-                      </span>
-                    ) : (
-                      <>
-                        <ClipboardPaste className="w-4 h-4 mr-1" />
-                        {importTarget === "default" ? "保存为默认配置" : "导入配置"}
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </>
+                  }
+                }}
+                className="bg-rose-500 hover:bg-rose-600 text-white"
+              >
+                复制到剪贴板
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 导入对话框 */}
+      {showImportDialog && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-4">
+            <h3 className="font-bold mb-3">导入配置</h3>
+            <div className="mb-3">
+              <label className="text-sm text-muted-foreground mb-1 block">导入目标</label>
+              <div className="flex gap-2">
+                <Button
+                  variant={importTarget === "current" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setImportTarget("current")}
+                  className={importTarget === "current" ? "bg-rose-500" : "bg-transparent"}
+                >
+                  当前房间
+                </Button>
+                <Button
+                  variant={importTarget === "default" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setImportTarget("default")}
+                  className={importTarget === "default" ? "bg-rose-500" : "bg-transparent"}
+                >
+                  默认配置
+                </Button>
+              </div>
+            </div>
+            {importTarget === "default" && (
+              <div className="mb-3">
+                <label className="text-sm text-muted-foreground mb-1 block">管理员密码</label>
+                <Input
+                  type="password"
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  placeholder="请输入管理员密码"
+                />
+              </div>
             )}
+            <textarea
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              className="w-full h-48 p-2 border rounded text-xs font-mono"
+              placeholder="粘贴配置JSON..."
+            />
+            <div className="flex gap-2 mt-3 justify-end">
+              <Button variant="outline" onClick={() => setShowImportDialog(false)} className="bg-transparent">
+                取消
+              </Button>
+              <Button
+                onClick={handleImport}
+                disabled={isSubmitting || !importText.trim()}
+                className="bg-rose-500 hover:bg-rose-600 text-white"
+              >
+                {isSubmitting ? "保存中..." : "导入配置"}
+              </Button>
+            </div>
           </div>
         </div>
       )}

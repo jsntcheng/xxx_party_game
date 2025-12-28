@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import type { GameCell, GameConfig } from "@/lib/game-data"
+import type { GameCell, GameConfig, SceneCard } from "@/lib/game-data"
 
 export interface SyncState {
   player1Position: number
@@ -9,7 +9,7 @@ export interface SyncState {
   currentPlayer: 1 | 2
   skipNextTurn: { player1: boolean; player2: boolean }
   canRollAgain: boolean
-  winner: string | null
+  winner: number | null
   cells: GameCell[]
   endpointCells: GameCell[]
   isRolling?: boolean
@@ -21,6 +21,9 @@ export interface SyncState {
   taskChangedCells?: { [cellIndex: number]: boolean }
   player2Joined?: boolean
   config?: GameConfig
+  drawnSceneCards?: SceneCard[]
+  sceneCardsDrawn?: boolean
+  nextPlayerNumber?: number
 }
 
 export function useGameSync(roomId: string | null, enabled: boolean) {
