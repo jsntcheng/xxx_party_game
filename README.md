@@ -2,297 +2,120 @@
 
 # 🎲 情侣飞行棋
 
-**一款浪漫有趣的双人飞行棋游戏，专为情侣设计**
+**专为情侣设计的双人飞行棋：真心话 · 大冒险 · 亲亲抱抱**
 
-支持多端同步 · 自定义任务 · 性别专属内容
-
----
-
-[开始游戏](#快速开始) · [功能特点](#功能特点) · [部署指南](#部署指南) · [配置说明](#配置说明) · [自定义指南](#自定义指南)
+两台手机实时联机 · 一台设备同屏游玩 · 任务、棋盘、场景卡全部可自定义
 
 </div>
 
 ---
 
-## 功能特点
+## 功能
 
-### 🎮 丰富的游戏玩法
-- **多种格子类型** - 真心话、大冒险、亲亲、抱抱、前进、后退等
-- **性别专属任务** - 可为男生/女生配置不同的专属任务
-- **任务换一换** - 普通格子支持更换为性别专属任务（每格限一次）
-- **特殊格子** - 自定义固定位置的特殊事件
+- **两种玩法**
+  - **联机**：创建房间，把 6 位房间号或邀请链接发给 TA，双方各用自己的手机，实时同步
+  - **同屏**：一台设备轮流操作，不依赖网络，进度保存在浏览器里
+- **丰富的格子**：甜蜜任务、真心话、大冒险、亲亲、抱抱、惩罚、奖励，以及前进 / 后退 / 回到起点 / 停一轮 / 再掷一次 / 交换位置等效果格，终点前还有「终点冲刺」区
+- **按性别抽任务**：甜蜜任务格落到时才抽，范围是「普通」里适合自己的任务加上自己的专属任务，不满意可以「换一个」（每格一次）；其他格子落到只适合异性的任务会自动换成适合自己的
+- **场景卡**：开局从每个卡池各抽一张，整局生效
+- **共享计时器**：预设 30 秒 / 1 分 / 2 分 / 10 分，也可以自定秒数，联机时双方看到同一个倒计时，最后 5 秒有提示音
+- **自定义**：任务内容、棋盘长度、固定位置、终点奖励、场景卡都能编辑；配置可以导出 / 导入 JSON（兼容旧版导出的配置），管理员可以把配置设为服务器默认
+- **断线重连**：刷新页面或重新打开邀请链接会自动回到原来的座位
 
-### 👫 双人游戏模式
-- **在线对战** - 创建房间，分享房间号，异地也能一起玩
-- **本地双人** - 两人共用一台设备，面对面游戏
-- **等待房间** - 房主创建后等待对方加入，双方就绪后开始
+## 游戏规则
 
-### ⚙️ 高度可定制
-- **自定义格子内容** - 编辑各类格子的任务内容
-- **性别专属配置** - 分别配置男生任务和女生任务
-- **特殊位置设定** - 设置特殊格子的固定位置
-- **终点奖励** - 自定义到达终点的奖励内容
-- **配置导入导出** - 保存和分享你的游戏配置
-- **默认配置管理** - 管理员可设置服务器默认配置
-
-### 🕐 实用工具
-- **游戏计时器** - 支持 30秒/1分钟/2分钟/10分钟 快速选择
-- **自定义计时** - 可输入任意秒数
-- **计时器同步** - 在线模式下计时器状态同步
-
-### 📱 全平台适配
-- **响应式设计** - 完美适配手机和电脑
-- **触屏优化** - 移动端操作流畅
-
----
+1. 双方轮流掷骰子（1~6）前进，落到哪格就完成哪格的任务
+2. 任务完成后才结算格子效果；效果造成的移动不会触发新格子的任务
+3. 「停一轮」：轮到该玩家时跳过一次，由对方继续
+4. 先到达终点的一方获胜，赢家领取终点奖励
 
 ## 快速开始
 
-### 本地游戏（无需配置）
+需要 Node.js 20+ 与 pnpm。
 
-直接访问游戏页面，选择「本地双人游戏」即可开始。
-
-### 在线联机
-
-1. **创建房间** - 选择性别，点击「创建房间」
-2. **分享房间号** - 将 6 位房间号发送给对方
-3. **等待加入** - 对方输入房间号加入
-4. **开始游戏** - 双方就绪后自动开始
-
----
-
-## 部署指南
-
-### 1. 安装 Node.js
-
-推荐使用 Node.js 18 或更高版本。
-
-**Windows:**
-\`\`\`bash
-# 下载安装包
-# 访问 https://nodejs.org/ 下载 LTS 版本并安装
-
-# 或使用 winget
-winget install OpenJS.NodeJS.LTS
-\`\`\`
-
-**macOS:**
-\`\`\`bash
-# 使用 Homebrew
-brew install node@22
-\`\`\`
-
-**Linux (Ubuntu/Debian):**
-\`\`\`bash
-# 使用 NodeSource
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt-get install -y nodejs
-\`\`\`
-
-验证安装：
-\`\`\`bash
-node -v  # 应显示 v22.x.x 或更高
-npm -v   # 应显示 npm 版本
-\`\`\`
-
-### 2. 安装 pnpm
-
-\`\`\`bash
-# 使用 npm 安装 pnpm
-npm install -g pnpm
-
-# 验证安装
-pnpm -v
-\`\`\`
-
-### 3. 设置镜像源（国内用户推荐）
-
-\`\`\`bash
-# 设置 npm 镜像
-npm config set registry https://registry.npmmirror.com
-
-# 设置 pnpm 镜像
-pnpm config set registry https://registry.npmmirror.com
-
-# 验证镜像设置
-pnpm config get registry
-\`\`\`
-
-### 4. 克隆并安装项目
-
-\`\`\`bash
-# 克隆项目
-git clone https://github.com/jsntcheng/xxx_party_game.git
-cd xxx-party-game
-
-# 安装依赖
+```bash
 pnpm install
-\`\`\`
+pnpm dev          # http://localhost:3000
+```
 
-### 5. 配置环境变量
+国内网络安装慢时可以临时指定镜像：`pnpm install --registry=https://registry.npmmirror.com`
 
-\`\`\`bash
-# 复制环境变量模板
-cp .env.example .env.local
+生产部署：
 
-# 编辑配置文件
-# Windows: notepad .env.local
-# macOS/Linux: nano .env.local
-\`\`\`
-
-根据需要配置以下变量（参见 [配置说明](#配置说明)）：
-- `DATABASE_URL` - 数据库连接(可选)
-- `ADMIN_PASSWORD` - 管理员密码(可选)
-- `ROOM_EXPIRY_HOURS` - 房间过期时限(可选)
-
-### 6. 启动项目
-
-**开发模式：**
-\`\`\`bash
-pnpm dev
-\`\`\`
-访问 http://localhost:3000
-
-**生产模式：**
-\`\`\`bash
-# 构建项目
+```bash
 pnpm build
+pnpm start        # 默认 3000 端口，可用 PORT=8080 pnpm start 指定
+```
 
-# 启动服务
-pnpm start
-\`\`\`
+## 配置
 
-**指定端口启动：**
-\`\`\`bash
-# 开发模式指定端口
-pnpm dev -p 8080
+复制 `.env.example` 为 `.env.local` 后按需填写：
 
-# 生产模式指定端口
-PORT=8080 pnpm start
-\`\`\`
+| 变量 | 说明 |
+| --- | --- |
+| `DATABASE_URL` | MySQL 连接串，如 `mysql://user:pass@host:3306/db`。不配置时使用 `data/rooms.json` |
+| `ADMIN_PASSWORD` | 管理员密码，用于保存服务器默认配置。不配置则不允许修改默认配置 |
+| `ROOM_EXPIRY_HOURS` | 房间无操作多久后清理，默认 24 |
 
-### 7. 使用 PM2 后台运行（可选）
+### 存储方式怎么选
 
-\`\`\`bash
-# 安装 PM2
-pnpm add -g pm2
+| 部署方式 | 存储 |
+| --- | --- |
+| 单台服务器、单进程（`pnpm start`、PM2 单实例） | JSON 文件即可 |
+| Vercel 等 Serverless、PM2 cluster、多实例 | **必须**配置 MySQL（实例之间不共享内存和文件） |
 
-# 构建项目
-pnpm build
+使用 MySQL 时，首次访问会自动建表：`party_rooms`（房间）、`party_presence`（在线状态）、`game_config`（默认配置，与旧版同名表兼容）。
 
-# 启动服务
-pm2 start npm --name "couple-game" -- start
+## 开发
 
-# 查看状态
-pm2 status
+```bash
+pnpm typecheck    # TypeScript 检查
+pnpm test         # 单元测试（规则引擎、配置校验、房间服务、安全）
+```
 
-# 查看日志
-pm2 logs couple-game
+### 目录结构
 
-# 开机自启
-pm2 startup
-pm2 save
-\`\`\`
+```
+lib/game/          规则与领域模型（纯函数，前后端共用）
+  types.ts         领域类型
+  engine.ts        规则引擎 applyAction(snapshot, action, ctx)
+  board.ts         棋盘生成、场景卡抽取、随机数
+  config.ts        配置校验与旧版格式兼容 parseGameConfig
+  action.ts        操作 / 玩家资料校验
+  defaults.ts      内置默认配置
+  meta.ts          格子类型的名称与说明
+lib/server/        服务端
+  rooms.ts         房间服务：鉴权 → 版本校验 → 规则引擎 → CAS 写入
+  store/           存储（JSON 文件 / MySQL）
+  http.ts          统一错误处理与响应
+  security.ts      管理员密码校验（常量时间比较）
+lib/client/        浏览器端：接口封装、本地存储、GameController 接口
+hooks/             联机轮询、同屏对局、棋子动画
+components/        界面（大厅、棋盘、弹窗、配置编辑器）
+app/api/           接口路由
+tests/             单元测试
+```
 
----
+### 同步模型
 
-## 配置说明
+- 服务端是唯一权威：客户端只提交操作（掷骰、完成任务……），由服务端执行规则、生成随机数
+- 每个房间有递增的 `version`；客户端提交时带上 `baseVersion`，不一致返回 409 并附最新状态，写入使用 CAS 防止并发覆盖
+- 客户端每秒轮询一次，版本没变时只返回在线状态；页面隐藏时暂停轮询
+- 每个座位有独立 token（保存在浏览器），只有本人能操作自己的回合
 
-### 环境变量
+### 接口
 
-在项目根目录创建 `.env.local` 文件：
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/config` | 获取默认配置 |
+| POST | `/api/config` | 保存默认配置 `{ password, config }` |
+| POST | `/api/rooms` | 创建房间 `{ name, gender }` |
+| POST | `/api/rooms/:id/join` | 加入 / 重连房间 |
+| GET | `/api/rooms/:id?since=版本` | 轮询房间 |
+| POST | `/api/rooms/:id/actions` | 提交操作 `{ baseVersion, action }` |
 
-\`\`\`env
-# 数据库配置（可选，不配置则使用本地 JSON 文件存储）
-DATABASE_URL=mysql://用户名:密码@主机:端口/数据库名
-
-# 管理员密码（用于保存默认配置）
-ADMIN_PASSWORD=your_admin_password
-
-# 房间过期时限（小时，默认 24）
-ROOM_EXPIRY_HOURS=24
-\`\`\`
-
-### 存储方式
-
-| 配置方式 | 存储位置 | 适用场景 |
-|---------|---------|---------|
-| 无 DATABASE_URL | `data/rooms.json` | 本地开发、单机部署 |
-| 有 DATABASE_URL | MySQL 数据库 | 生产环境、多实例部署 |
-
-### 数据库初始化
-
-如使用 MySQL，应用启动时会自动创建所需表，无需手动执行 SQL。
-
----
-
-## 自定义指南
-
-点击游戏界面的「自定义」按钮进入配置：
-
-### 基础设置
-- **棋盘大小** - 设置游戏格子总数
-- **终点奖励** - 编辑到达终点的奖励内容
-
-### 格子内容
-- **普通格子** - 真心话、大冒险等随机内容
-- **男生任务** - 男生专属的任务内容
-- **女生任务** - 女生专属的任务内容
-
-### 位置设定
-- 为特殊格子类型指定固定位置
-- 支持前进、后退、亲亲、抱抱等类型
-
-### 导入导出
-- **导出配置** - 复制当前配置 JSON
-- **导入配置** - 可选择导入到当前房间或默认配置
-- **默认配置** - 需要管理员密码验证
-
----
+房间相关请求通过 `x-seat-token` 头携带座位 token。
 
 ## 技术栈
 
-- **框架** - Next.js 15 (App Router)
-- **语言** - TypeScript
-- **样式** - Tailwind CSS
-- **数据库** - MySQL / JSON 文件
-- **部署** - Vercel / 自托管
-
----
-
-## 常见问题
-
-### Q: 启动时报错 "Module not found"
-\`\`\`bash
-# 删除依赖重新安装
-rm -rf node_modules pnpm-lock.yaml
-pnpm install
-\`\`\`
-
-### Q: 端口被占用
-\`\`\`bash
-# 使用其他端口
-pnpm dev -p 3001
-\`\`\`
-
-### Q: 国内安装依赖很慢
-确保已设置镜像源，参考 [设置镜像源](#3-设置镜像源国内用户推荐)
-
-### Q: 数据库连接失败
-- 检查 `DATABASE_URL` 格式是否正确
-- 确保 MySQL 服务已启动
-- 检查数据库用户权限
-
----
-
-## 开源协议
-
-MIT License
-
----
-
-<div align="center">
-
-**用心制作，为爱加码** 💕
-
-</div>
+Next.js 16（App Router）· React 19 · TypeScript · Tailwind CSS 4 · Radix UI · Framer Motion · MySQL / JSON 文件 · Vitest

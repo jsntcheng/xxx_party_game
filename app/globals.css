@@ -1,132 +1,162 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
+@theme {
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Hiragino Sans GB",
+    "Microsoft YaHei", "Segoe UI", Roboto, sans-serif;
+  --color-night: #140b24;
+  --color-night-soft: #1f1236;
+  --animate-float-up: float-up var(--float-duration, 14s) linear infinite;
+  --animate-glow: glow 2.4s ease-in-out infinite;
+  --animate-shimmer: shimmer 3s linear infinite;
+  --animate-dice-shake: dice-shake 0.28s ease-in-out infinite;
+
+  @keyframes float-up {
+    0% {
+      transform: translate3d(0, 0, 0) scale(var(--float-scale, 1));
+      opacity: 0;
+    }
+    10% {
+      opacity: var(--float-opacity, 0.5);
+    }
+    100% {
+      transform: translate3d(var(--float-drift, 20px), -110vh, 0) scale(var(--float-scale, 1)) rotate(25deg);
+      opacity: 0;
+    }
+  }
+  @keyframes glow {
+    0%,
+    100% {
+      box-shadow:
+        0 0 0 2px rgb(255 255 255 / 0.9),
+        0 0 12px 2px var(--glow-color, rgb(244 114 182 / 0.7));
+    }
+    50% {
+      box-shadow:
+        0 0 0 2px rgb(255 255 255 / 0.9),
+        0 0 26px 8px var(--glow-color, rgb(244 114 182 / 0.9));
+    }
+  }
+  @keyframes shimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+  /* 联机掷骰等待服务端结果时的摇晃 */
+  @keyframes dice-shake {
+    0%,
+    100% {
+      transform: translate(0, 0) rotate(0deg);
+    }
+    25% {
+      transform: translate(-3px, -2px) rotate(-9deg);
+    }
+    75% {
+      transform: translate(3px, -2px) rotate(9deg);
+    }
+  }
+}
 
 :root {
-  --background: oklch(0.98 0.01 60);
-  --foreground: oklch(0.25 0.02 30);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.25 0.02 30);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.25 0.02 30);
-  --primary: oklch(0.65 0.2 25);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.55 0.18 250);
-  --secondary-foreground: oklch(1 0 0);
-  --muted: oklch(0.95 0.01 60);
-  --muted-foreground: oklch(0.5 0.02 30);
-  --accent: oklch(0.85 0.15 85);
-  --accent-foreground: oklch(0.25 0.02 30);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.577 0.245 27.325);
-  --border: oklch(0.9 0.02 60);
-  --input: oklch(0.92 0.01 60);
-  --ring: oklch(0.65 0.2 25);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --radius: 0.75rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-
-  /* Game specific colors */
-  --game-pink: oklch(0.75 0.15 350);
-  --game-blue: oklch(0.55 0.18 250);
-  --game-yellow: oklch(0.85 0.15 85);
-  --game-red: oklch(0.6 0.22 25);
-  --game-green: oklch(0.65 0.18 145);
+  color-scheme: dark;
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.439 0 0);
+html,
+body {
+  background: var(--color-night);
+  color: rgb(255 255 255 / 0.92);
+  -webkit-tap-highlight-color: transparent;
 }
 
-@theme inline {
-  --font-sans: "Geist", "Geist Fallback";
-  --font-mono: "Geist Mono", "Geist Mono Fallback";
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
+body {
+  min-height: 100dvh;
 }
 
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
+/* 毛玻璃面板 */
+@utility glass {
+  background: rgb(255 255 255 / 0.06);
+  border: 1px solid rgb(255 255 255 / 0.1);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+}
+
+@utility glass-strong {
+  background: rgb(30 17 52 / 0.82);
+  border: 1px solid rgb(255 255 255 / 0.12);
+  backdrop-filter: blur(28px) saturate(150%);
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
+}
+
+/* 渐变文字 */
+@utility text-gradient {
+  background: linear-gradient(100deg, #fda4af 0%, #f472b6 35%, #c084fc 70%, #fdba74 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* 页面背景：夜色 + 粉紫橙光晕 */
+.app-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  background:
+    radial-gradient(55% 45% at 12% 8%, rgb(236 72 153 / 0.26), transparent 70%),
+    radial-gradient(50% 40% at 92% 18%, rgb(139 92 246 / 0.28), transparent 70%),
+    radial-gradient(60% 45% at 50% 105%, rgb(249 115 22 / 0.16), transparent 70%),
+    linear-gradient(180deg, #170c2a 0%, var(--color-night) 60%, #10081d 100%);
+}
+
+/* 3D 骰子：跳动/摇晃动画放在 .dice-scene 上，.dice-cube 只负责旋转，避免 animation 覆盖 transform */
+.dice-scene {
+  width: 100%;
+  height: 100%;
+  perspective: 700px;
+}
+
+.dice-cube {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.85s cubic-bezier(0.2, 0.8, 0.25, 1.05);
+}
+
+.dice-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  padding: 16%;
+  border-radius: 22%;
+  background: radial-gradient(circle at 30% 25%, #fff 0%, #fdf2f8 45%, #fbcfe8 100%);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.8),
+    inset 0 -6px 12px rgb(219 39 119 / 0.18);
+  backface-visibility: hidden;
+}
+
+.dice-pip {
+  width: 72%;
+  height: 72%;
+  place-self: center;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 35% 30%, #fb7185, #be123c);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float-up {
+    display: none;
   }
-  body {
-    @apply bg-background text-foreground;
+  .dice-cube {
+    transition-duration: 0.01s;
   }
 }
